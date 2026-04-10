@@ -79,8 +79,14 @@ const UI = (() => {
       const prizeCars = CARS.map((car, i) => ({ car, i })).filter(({ car }) => car.hidden);
       const cobraUnlocked = CobraUnlock.isUnlocked();
 
+      // Per-car unlock rules: ferrari458 always available, cobra requires Autobahn qualify
+      function _isCarUnlocked(car) {
+        if (car.id === 'cobra') return cobraUnlocked;
+        return true; // all other prize cars available by default
+      }
+
       prizeCars.forEach(({ car, i }) => {
-        const unlocked = cobraUnlocked; // extend this check per-car when more prize cars added
+        const unlocked = _isCarUnlocked(car);
         const card = document.createElement('div');
         card.className = 'car-card' + (i === selectedCarIndex && unlocked ? ' selected' : '')
           + (unlocked ? '' : ' locked-slot');
@@ -125,8 +131,11 @@ const UI = (() => {
         grid.appendChild(card);
       }
 
-      // If a prize car is selected, show its detail; else show first standard car
-      if (!prizeCars.some(({ i }) => i === selectedCarIndex) || !cobraUnlocked) {
+      // If selected car isn't a prize car or isn't unlocked, fall back to detail of first unlocked prize car
+      const selectedPrize = prizeCars.find(({ i }) => i === selectedCarIndex);
+      if (!selectedPrize || !_isCarUnlocked(selectedPrize.car)) {
+        const firstUnlocked = prizeCars.find(({ car }) => _isCarUnlocked(car));
+        if (firstUnlocked) selectedCarIndex = firstUnlocked.i;
         _updateCarDetail(); return;
       }
     }

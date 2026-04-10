@@ -18,6 +18,7 @@ const CARS = [
     type: 'sports',
     description: 'Glass cannon. Fastest on tarmac,\ndisasters off-road.',
     crashResistance: 0.35,
+    hidden: true,
     surfacePenalties: {
       dirt: 0.55, ice: 0.45, oil: 0.40, pothole: 0.35, jump: 'spinout'
     }
