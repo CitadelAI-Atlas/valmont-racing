@@ -28,8 +28,8 @@ const Game = (() => {
     // Fill full viewport minus HUD only — controls are fixed overlay
     const w = window.innerWidth;
     const h = window.innerHeight - 32;
-    // Force 4× physical pixels for sharp rendering matching sprite quality
-    const dpr = 4;
+    // Match device pixel ratio for crisp rendering without excess pixel cost
+    const dpr = Math.min(window.devicePixelRatio || 2, 2);
     canvas.width  = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width  = w + 'px';
@@ -122,7 +122,7 @@ const Game = (() => {
   // ── Main loop ──────────────────────────────
   let lastTs = 0;
   function _loop(ts, mode) {
-    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0.016;
+    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.033) : 0.016;
     lastTs = ts;
 
     if (state === mode || countdown > 0) {
@@ -295,15 +295,17 @@ const Game = (() => {
     nullarbor:  ['OffRoad01','OffRoad02','Highway01','Comfort01'],
   };
 
-  // Speed ranges per traffic type (in tc.speed units; player moves at speed*90, traffic at speed*45)
+  // Speed ranges in mph / 100 (same units as playerSpeed).
+  // Traffic moves at tc.speed * 90 * dt — identical scale to the player.
+  // Sport cars can exceed slower player cars and will steer around them.
   const TRAFFIC_SPEEDS = {
-    Sport01:   { min: 0.80, max: 1.15 },
-    Sport02:   { min: 0.85, max: 1.20 },
-    Sport03:   { min: 0.90, max: 1.30 },
-    OffRoad01: { min: 0.40, max: 0.65 },
-    OffRoad02: { min: 0.45, max: 0.70 },
-    Comfort01: { min: 0.55, max: 0.80 },
-    Highway01: { min: 0.38, max: 0.58 },
+    Highway01: { min: 0.70, max: 0.80 },   // big trucks  70–80 mph
+    OffRoad01: { min: 0.78, max: 0.88 },   // off-road    78–88 mph
+    OffRoad02: { min: 0.78, max: 0.90 },   // off-road    78–90 mph
+    Comfort01: { min: 0.85, max: 0.98 },   // comfort     85–98 mph
+    Sport01:   { min: 0.95, max: 1.10 },   // sport      95–110 mph
+    Sport02:   { min: 1.00, max: 1.15 },   // sport     100–115 mph
+    Sport03:   { min: 1.05, max: 1.20 },   // sport     105–120 mph
   };
 
   function _spawnTraffic(density) {
@@ -326,11 +328,20 @@ const Game = (() => {
   }
 
   function _updateTraffic(dt) {
-    // Clear old sprites
     segments.forEach(s => { s.sprites = s.sprites.filter(sp => sp.type !== 'car'); });
     trafficCars.forEach(tc => {
-      tc.z += tc.speed * 45 * dt;
+      tc.z += tc.speed * 90 * dt;
       if (tc.z >= segments.length) tc.z -= segments.length;
+
+      // Overtake avoidance — if faster than player and closing from behind, steer around
+      const tSeg = Math.floor(tc.z) % segments.length;
+      const pSeg = Math.floor(playerZ)  % segments.length;
+      const behind = ((pSeg - tSeg + segments.length) % segments.length) < 25;
+      if (behind && tc.speed > playerSpeed + 0.05 && Math.abs(tc.x - playerX) < 0.45) {
+        const target = playerX >= 0 ? -0.65 : 0.65;
+        tc.x += (target - tc.x) * Math.min(1, 3 * dt);
+      }
+
       const seg = segments[Math.floor(tc.z) % segments.length];
       if (seg) seg.sprites.push({ type: 'car', car: tc.car, lane: tc.x });
     });
@@ -340,7 +351,12 @@ const Game = (() => {
     trafficCars.forEach(tc => {
       if (tc._hitCooldown > 0) { tc._hitCooldown--; return; }
       const tSeg = Math.floor(tc.z) % segments.length;
-      if (Math.abs(tSeg - pSeg) < 4 && Math.abs(tc.x - playerX) < 0.28) {
+      // Only collide when traffic is ahead of player (player running into it).
+      // Skip if traffic is overtaking from behind — avoidance logic handles that.
+      const segDiff = (tSeg - pSeg + segments.length) % segments.length;
+      const trafficAhead = segDiff < segments.length / 2;
+      if (!trafficAhead || segDiff >= 4) return;
+      if (Math.abs(tc.x - playerX) < 0.28) {
         const spdR   = playerMaxSpeed > 0 ? playerSpeed / playerMaxSpeed : 0;
         const resist = car.crashResistance || 1.0;
         // impact: how devastating the crash is — fast + fragile car = much higher
