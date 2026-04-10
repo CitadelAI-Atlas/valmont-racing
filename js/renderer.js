@@ -151,7 +151,7 @@ const Renderer = (() => {
           // Tighter lane multiplier keeps cars on the road; clamp to road edges
           const laneOffset = sprite.lane * sRW * 0.62;
           sx = sMX + Math.max(-sRW * 0.80, Math.min(sRW * 0.80, laneOffset));
-          sw = Math.min(sRW * 0.46, W * 0.28);
+          sw = Math.min(sRW * 0.38, W * 0.22);
           sh = sw * 1.20;
         } else {
           // Scenery / hazards — original formula, no clamp

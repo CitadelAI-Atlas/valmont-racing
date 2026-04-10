@@ -343,7 +343,9 @@ const Game = (() => {
       }
 
       const seg = segments[Math.floor(tc.z) % segments.length];
-      if (seg) seg.sprites.push({ type: 'car', car: tc.car, lane: tc.x, zFrac: tc.z - Math.floor(tc.z) });
+      // zFrac must be relative to playerZ so renderer interpolation stays accurate
+      const dist = ((tc.z - playerZ) + segments.length) % segments.length;
+      if (seg) seg.sprites.push({ type: 'car', car: tc.car, lane: tc.x, zFrac: dist % 1 });
     });
   }
 
