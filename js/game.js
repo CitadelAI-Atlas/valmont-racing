@@ -23,7 +23,7 @@ const Game = (() => {
   function _sizeCanvas() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
 
     // Fill full viewport minus HUD only — controls are fixed overlay
     const w = window.innerWidth;

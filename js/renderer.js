@@ -84,23 +84,32 @@ const Renderer = (() => {
     const startSeg  = Math.floor(playerZ) % totalSegs;
 
     // ── Project segments (near → far) ────────
+    // Non-linear n steps: fine near the player (reduces blocky close strips),
+    // coarser farther away where strips are already thin.
     const proj = [];
     let cumCurve = 0;
     let cumHill  = 0;
 
-    for (let n = 1; n <= DRAW_DISTANCE; n++) {
-      const idx  = (startSeg + n) % totalSegs;
-      const seg  = segments[idx];
+    let n = 1;
+    while (n <= DRAW_DISTANCE) {
+      const step = n < 2  ? 0.15 :
+                   n < 5  ? 0.30 :
+                   n < 15 ? 0.75 :
+                   n < 60 ? 1.5  : 3;
+
+      const idx   = (startSeg + Math.round(n)) % totalSegs;
+      const seg   = segments[idx];
       const scale = 1 / n;
 
       const screenY = horizon + roadH * scale + cumHill * scale * roadH;
-      const roadW = ROAD_WIDTH * scale * (W / 1000);
-      const midX = W / 2 - playerX * roadW * 0.6 + cumCurve;
+      const roadW   = ROAD_WIDTH * scale * (W / 1000);
+      const midX    = W / 2 - playerX * roadW * 0.6 + cumCurve;
 
-      cumCurve += seg.curve * scale * W * 0.15;
-      cumHill  -= seg.hill * scale * 0.5;
+      cumCurve += seg.curve * scale * W * 0.15 * step;
+      cumHill  -= seg.hill  * scale * 0.5      * step;
 
       proj.push({ seg, screenY, roadW, midX, scale, n });
+      n += step;
     }
 
     // ── Draw far → near (painter's algorithm) ──
