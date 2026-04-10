@@ -135,43 +135,33 @@ const Renderer = (() => {
       for (const sprite of cur.seg.sprites) {
         if (sprite.type === 'car' && cur.n < 2) continue;
 
-        // Sub-segment interpolation for traffic cars:
-        // blend screenY/roadW/midX between this segment and the next farther one
-        // using the car's fractional z position — eliminates segment-boundary snapping.
         let sY = cur.screenY, sRW = cur.roadW, sMX = cur.midX;
-        if (sprite.type === 'car' && sprite.zFrac !== undefined && i < proj.length - 1) {
-          const far = proj[i + 1];
-          const f   = sprite.zFrac;
-          sY  = cur.screenY + (far.screenY - cur.screenY) * f;
-          sRW = cur.roadW   + (far.roadW   - cur.roadW)   * f;
-          sMX = cur.midX    + (far.midX    - cur.midX)    * f;
-        }
+        let sx, sh, sw;
 
-        // Tighter lane multiplier keeps cars visually on the road at all distances
-        const laneOffset = sprite.lane * sRW * 0.62;
-        const sx = sMX + Math.max(-sRW * 0.80, Math.min(sRW * 0.80, laneOffset));
-
-        let sh, sw;
         if (sprite.type === 'car') {
+          // Sub-segment interpolation: blend between this segment and the next
+          // farther one using zFrac — eliminates segment-boundary Y snapping.
+          if (sprite.zFrac !== undefined && i < proj.length - 1) {
+            const far = proj[i + 1];
+            const f   = sprite.zFrac;
+            sY  = cur.screenY + (far.screenY - cur.screenY) * f;
+            sRW = cur.roadW   + (far.roadW   - cur.roadW)   * f;
+            sMX = cur.midX    + (far.midX    - cur.midX)    * f;
+          }
+          // Tighter lane multiplier keeps cars on the road; clamp to road edges
+          const laneOffset = sprite.lane * sRW * 0.62;
+          sx = sMX + Math.max(-sRW * 0.80, Math.min(sRW * 0.80, laneOffset));
           sw = Math.min(sRW * 0.46, W * 0.28);
           sh = sw * 1.20;
         } else {
+          // Scenery / hazards — original formula, no clamp
+          sx = cur.midX + sprite.lane * cur.roadW * 0.80;
           const baseH = Math.max(2, cur.roadW * 0.90);
           sh = baseH * (sprite.hScale || 1);
           sw = sh * (sprite.wRatio || 1.4);
         }
 
-        // Fade out smoothly as car passes player (avoids hard pop at n<2 cutoff)
-        if (sprite.type === 'car' && cur.n < 5) {
-          const alpha = Math.min(1, (cur.n - 1.8) / 3.0);
-          if (alpha <= 0) continue;
-          ctx.save();
-          ctx.globalAlpha = alpha;
-          _drawSprite(ctx, sprite, sx, sY - sh, sw, sh);
-          ctx.restore();
-        } else {
-          _drawSprite(ctx, sprite, sx, sY - sh, sw, sh);
-        }
+        _drawSprite(ctx, sprite, sx, sY - sh, sw, sh);
       }
     }
 
