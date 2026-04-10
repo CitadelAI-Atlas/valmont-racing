@@ -144,7 +144,8 @@ const UI = (() => {
 
   function _updateCarDetail() {
     const car = CARS[selectedCarIndex];
-    document.getElementById('car-name').textContent = car.name + ' (' + car.color + ')';
+    document.getElementById('car-name').textContent = car.name;
+    document.getElementById('car-color').textContent = car.color;
     document.getElementById('car-desc').textContent = car.description;
 
     const s = document.getElementById('car-stats');
