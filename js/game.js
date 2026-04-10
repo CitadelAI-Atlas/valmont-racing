@@ -343,7 +343,7 @@ const Game = (() => {
       }
 
       const seg = segments[Math.floor(tc.z) % segments.length];
-      if (seg) seg.sprites.push({ type: 'car', car: tc.car, lane: tc.x });
+      if (seg) seg.sprites.push({ type: 'car', car: tc.car, lane: tc.x, zFrac: tc.z - Math.floor(tc.z) });
     });
   }
 
