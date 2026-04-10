@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>VALMONT RACING</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- TITLE SCREEN -->
+  <div id="screen-title" class="screen active">
+    <div class="title-logo">
+      <div class="title-line1">VALMONT</div>
+      <div class="title-line2">R A C I N G</div>
+    </div>
+    <button class="big-btn blink" id="btn-start">TAP TO START</button>
+    <div class="title-footer">MOBILE OPTIMIZED | M = MUSIC</div>
+  </div>
+
+  <!-- CAR SELECT SCREEN -->
+  <div id="screen-car-select" class="screen">
+    <div class="screen-title">CHOOSE YOUR RIDE</div>
+    <div class="car-page-tabs">
+      <button class="page-tab active" id="btn-page-standard">STANDARD</button>
+      <button class="page-tab" id="btn-page-prize">PRIZE CARS</button>
+    </div>
+    <div id="car-grid" class="car-grid"></div>
+    <div id="car-detail" class="car-detail">
+      <canvas id="car-preview" width="800" height="320"></canvas>
+      <div id="car-name" class="car-name"></div>
+      <div id="car-desc" class="car-desc"></div>
+      <div id="car-stats" class="car-stats"></div>
+    </div>
+    <button class="big-btn" id="btn-car-confirm">SELECT ▶</button>
+  </div>
+
+  <!-- TRACK SELECT SCREEN -->
+  <div id="screen-track-select" class="screen">
+    <div class="screen-title">CHOOSE TRACK</div>
+    <div id="track-grid" class="track-grid"></div>
+    <div id="track-detail" class="track-detail">
+      <div id="track-name" class="track-name"></div>
+      <div id="track-desc" class="track-desc"></div>
+      <div id="track-hazards" class="track-hazards"></div>
+      <div id="track-leaderboard" class="track-leaderboard"></div>
+    </div>
+    <button class="big-btn" id="btn-race">RACE ▶</button>
+    <button class="small-btn" id="btn-back-car">◀ BACK TO CARS</button>
+  </div>
+
+  <!-- GAME SCREEN (qualify + race share one canvas) -->
+  <div id="screen-game" class="screen">
+    <div id="game-hud" class="game-hud">
+      <div id="hud-left"></div>
+      <div id="hud-center"></div>
+      <div id="hud-right"></div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <div id="game-msg" class="game-msg"></div>
+    <div class="touch-controls" id="touch-controls">
+      <div id="touch-overlay">
+        <div id="zone-gas"   class="touch-zone"><span>▲ GAS</span></div>
+        <div id="zone-brake" class="touch-zone"><span>▼ BRAKE</span></div>
+        <div id="zone-left"  class="touch-zone steer-zone"><span>◀</span></div>
+        <div id="zone-right" class="touch-zone steer-zone"><span>▶</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COBRA PRIZE SCREEN -->
+  <div id="screen-cobra-prize" class="screen">
+    <div class="cobra-prize-header">★ YOU'VE UNLOCKED A NEW CAR ★</div>
+    <img id="cobra-prize-img" src="sprites/Cobra_prize.png" class="cobra-prize-img" alt="1965 Shelby Cobra 427" />
+    <div class="cobra-prize-name">1965 SHELBY COBRA 427</div>
+    <div class="cobra-prize-desc">The fastest production car for over 20 years.
+No roof, no traction control, no rules!
+The car that scared every manufacturer on earth.</div>
+    <div class="cobra-prize-stats">TOP SPEED ▸ 165 MPH
+ACCEL ▸ 148
+HANDLING ▸ 72</div>
+    <button class="big-btn blink" id="btn-cobra-race">TAKE THE WHEEL ▶</button>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="screen-results" class="screen">
+    <div class="screen-title" id="results-title">RACE COMPLETE</div>
+    <div id="results-body" class="results-body"></div>
+    <div id="name-entry-row" class="name-entry-row">
+      <div class="name-entry-label">ENTER YOUR NAME:</div>
+      <input type="text" id="player-name-input" class="name-input"
+             placeholder="RACER" maxlength="14"
+             autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
+      <button class="big-btn" id="btn-save-score">SAVE SCORE ▶</button>
+    </div>
+    <button class="small-btn" id="btn-continue" style="margin-top:6px;">SKIP ▶</button>
+  </div>
+
+  <script>
+    // Show any JS error visibly on screen so we can diagnose
+    window.onerror = function(msg, src, line, col, err) {
+      var d = document.getElementById('err-overlay');
+      if (!d) {
+        d = document.createElement('div');
+        d.id = 'err-overlay';
+        d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#f00;color:#fff;font-size:11px;padding:8px;z-index:9999;white-space:pre-wrap;word-break:break-all;';
+        document.body.appendChild(d);
+      }
+      d.textContent += (src||'?').split('/').pop() + ':' + line + ' — ' + msg + '\n';
+      return false;
+    };
+  </script>
+  <script src="js/audio.js?v=63"></script>
+  <script src="js/sprites.js?v=63"></script>
+  <script src="js/cars.js?v=63"></script>
+  <script src="js/tracks.js?v=63"></script>
+  <script src="js/renderer.js?v=63"></script>
+  <script src="js/ui.js?v=63"></script>
+  <script src="js/game.js?v=63"></script>
+  <script>
+    // Confirm everything wired up
+    var btn = document.getElementById('btn-start');
+    if (!btn) {
+      window.onerror('btn-start element not found', 'init', 0);
+    } else {
+      btn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        btn.click();
+      }, { passive: false });
+    }
+  </script>
+</body>
+</html>

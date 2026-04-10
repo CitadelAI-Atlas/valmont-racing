@@ -1,0 +1,424 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  background: #000;
+  color: #fff;
+  font-family: 'Press Start 2P', monospace;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── SCREEN SHELL ─── */
+.screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 100vw; height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 12px env(safe-area-inset-bottom, 12px);
+}
+#screen-car-select {
+  overflow: hidden;
+  padding: 10px 12px env(safe-area-inset-bottom, 8px);
+}
+#screen-car-select .car-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  align-content: start;
+}
+
+#screen-track-select {
+  padding: 8px 10px env(safe-area-inset-bottom, 8px);
+}
+#screen-track-select .screen-title { margin-bottom: 6px; font-size: min(4vw, 14px); }
+#screen-track-select .big-btn  { margin-top: 6px; padding: 10px 20px; font-size: min(3vw, 11px); }
+#screen-track-select .small-btn { margin-top: 4px; padding: 8px 16px; font-size: min(2.5vw, 9px); }
+.screen.active { display: flex; }
+
+/* ─── TITLE ─── */
+.title-logo { text-align: center; margin: 18vh 0 6vh; }
+.title-line1 {
+  font-size: min(12vw, 56px);
+  color: #ff0;
+  text-shadow: 3px 3px 0 #f80, 6px 6px 0 #f00;
+  letter-spacing: 4px;
+}
+.title-line2 {
+  font-size: min(4vw, 20px);
+  color: #0ff;
+  letter-spacing: min(3vw, 16px);
+  margin-top: 8px;
+}
+.title-footer {
+  margin-top: 24px;
+  font-size: min(2vw, 7px);
+  color: #444;
+  text-align: center;
+}
+
+/* ─── BUTTONS ─── */
+.big-btn {
+  background: #000;
+  color: #0ff;
+  border: 3px solid #0ff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: min(4.5vw, 16px);
+  padding: 16px 32px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 14px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0,255,255,0.2);
+}
+.big-btn:active { background: #0ff; color: #000; }
+
+.small-btn {
+  background: none;
+  color: #666;
+  border: 1px solid #333;
+  font-family: 'Press Start 2P', monospace;
+  font-size: min(3vw, 11px);
+  padding: 10px 20px;
+  margin-top: 10px;
+  width: 100%;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.blink { animation: blink 0.8s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.screen-title {
+  font-size: min(5vw, 18px);
+  color: #ff0;
+  text-shadow: 2px 2px 0 #f80;
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ─── CAR SELECT ─── */
+.car-page-tabs {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+.page-tab {
+  flex: 1;
+  background: #000;
+  color: #444;
+  border: 2px solid #333;
+  font-family: 'Press Start 2P', monospace;
+  font-size: min(2.8vw, 10px);
+  padding: 8px 4px;
+  cursor: pointer;
+  touch-action: manipulation;
+  letter-spacing: 1px;
+}
+.page-tab.active {
+  border-color: #ff0;
+  color: #ff0;
+  background: #111;
+}
+.car-card.locked-slot {
+  border-color: #1a1a1a;
+  color: #2a2a2a;
+  cursor: default;
+}
+.car-card.locked-slot canvas { opacity: 0.15; }
+
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+  flex-shrink: 0;
+}
+.car-card {
+  border: 2px solid #333;
+  padding: 4px 3px;
+  text-align: center;
+  font-size: min(2.5vw, 9px);
+  color: #777;
+  line-height: 1.7;
+  cursor: pointer;
+}
+.car-card.selected { border-color: #ff0; color: #ff0; background: #111; }
+.car-card canvas { display: block; margin: 0 auto 4px; width: 100%; height: auto; }
+
+.car-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  border: 1px solid #333;
+  background: #0a0a0a;
+  padding: 5px 8px;
+  margin-top: 4px;
+  gap: 3px;
+  flex-shrink: 0;
+}
+/* Hero image */
+#car-preview { image-rendering: auto; width: 100%; height: 110px; object-fit: contain; }
+.car-name { font-size: min(3.5vw, 13px); color: #0ff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.car-desc { font-size: min(2.5vw, 9px); color: #bbb; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.car-stats { font-size: min(2.5vw, 9px); color: #ddd; line-height: 2.0; width: 100%; }
+
+/* ─── TRACK SELECT ─── */
+.track-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  width: 100%;
+  flex-shrink: 0;
+}
+.track-card {
+  border: 2px solid #333;
+  padding: 5px 4px;
+  font-size: min(2.6vw, 9px);
+  color: #888;
+  text-align: center;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.track-card.selected { border-color: #ff0; color: #ff0; background: #111; }
+.track-card.locked { border-color: #1a1a1a; color: #333; }
+.track-card .tier-badge { display: block; font-size: min(2vw, 7px); margin-bottom: 1px; }
+.tier-1 .tier-badge { color: #0f0; }
+.tier-2 .tier-badge { color: #0ff; }
+.tier-3 .tier-badge { color: #ff0; }
+.tier-4 .tier-badge { color: #f80; }
+.tier-5 .tier-badge { color: #f0f; }
+
+.track-detail {
+  width: 100%;
+  border: 1px solid #333;
+  background: #0a0a0a;
+  padding: 7px 10px;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.track-name    { font-size: min(3.5vw, 13px); color: #0ff; margin-bottom: 4px; }
+.track-desc    { font-size: min(2vw, 7px); color: #bbb; line-height: 1.6; margin-bottom: 4px; white-space: pre-line; }
+.track-hazards { font-size: min(2vw, 7px); color: #f80; margin-bottom: 2px; }
+.track-leaderboard { margin-top: 5px; }
+.lb-entry { margin-bottom: 4px; }
+.lb-line1 { font-size: min(2.2vw, 8px); line-height: 1.8; }
+.lb-line2 { font-size: min(1.9vw, 7px); color: #666; line-height: 1.5; padding-left: 1.2em; }
+
+/* ─── GAME SCREEN ─── */
+#screen-game {
+  padding: 0;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+/* HUD at top */
+.game-hud {
+  position: fixed; top: 0; left: 0;
+  width: 100%; z-index: 20;
+  display: flex; justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(0,0,0,0.8);
+  font-size: min(2.5vw, 9px);
+  color: #ff0;
+}
+.game-hud div { white-space: nowrap; }
+
+/* Canvas fills full viewport behind fixed controls */
+#game-canvas {
+  display: block;
+  width: 100vw;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+/* Centre message (countdown, crash, etc) */
+.game-msg {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: min(6vw, 28px);
+  color: #ff0;
+  text-shadow: 2px 2px 0 #f00;
+  text-align: center;
+  pointer-events: none;
+  z-index: 25;
+  white-space: pre-line;
+  max-width: 80vw;
+  line-height: 1.8;
+}
+
+/* ─── TOUCH CONTROLS ─── */
+.touch-controls {
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 100%;
+  height: calc(min(22vw, 90px) + env(safe-area-inset-bottom, 0px) + 16px);
+  background: rgba(0,0,0,0.55);
+  z-index: 30;
+  /* Hidden and inert until game screen is active */
+  display: none;
+  pointer-events: none;
+}
+#screen-game.active .touch-controls {
+  display: block;
+  pointer-events: auto;
+}
+
+#touch-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 50% 25% 25%;
+  grid-template-rows: 50% 50%;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Press Start 2P', monospace;
+  pointer-events: none;
+  transition: background 0.06s, color 0.06s;
+}
+.touch-zone span { pointer-events: none; }
+
+#zone-gas {
+  grid-column: 1; grid-row: 1;
+  font-size: min(2.8vw, 11px);
+  color: #2a7a2a;
+  background: rgba(0, 60, 0, 0.18);
+  border-right: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1a1a1a;
+}
+#zone-brake {
+  grid-column: 1; grid-row: 2;
+  font-size: min(2.8vw, 11px);
+  color: #7a2a2a;
+  background: rgba(60, 0, 0, 0.18);
+  border-right: 1px solid #1a1a1a;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+#zone-left {
+  grid-column: 2; grid-row: 1 / span 2;
+  font-size: min(8vw, 30px);
+  color: #2a2a7a;
+  background: rgba(0, 0, 60, 0.18);
+  border-right: 1px solid #1a1a1a;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+#zone-right {
+  grid-column: 3; grid-row: 1 / span 2;
+  font-size: min(8vw, 30px);
+  color: #2a2a7a;
+  background: rgba(0, 0, 60, 0.18);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Active (pressed) states */
+#zone-gas.active   { background: rgba(0, 200, 0, 0.45);   color: #0f0; }
+#zone-brake.active { background: rgba(200, 0, 0, 0.45);   color: #f44; }
+#zone-left.active  { background: rgba(30, 120, 255, 0.45); color: #6cf; }
+#zone-right.active { background: rgba(30, 120, 255, 0.45); color: #6cf; }
+
+/* ─── COBRA PRIZE ─── */
+#screen-cobra-prize {
+  background: #000;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 12px;
+}
+.cobra-prize-header {
+  font-size: min(3.5vw, 13px);
+  color: #ff0;
+  text-shadow: 2px 2px 0 #f80;
+  text-align: center;
+  animation: blink 0.9s step-end infinite;
+}
+.cobra-prize-img {
+  width: 100%;
+  max-height: 42vh;
+  object-fit: contain;
+  border: 2px solid #444;
+  flex-shrink: 0;
+}
+.cobra-prize-name {
+  font-size: min(4.5vw, 17px);
+  color: #0ff;
+  text-align: center;
+  text-shadow: 2px 2px 0 #006;
+}
+.cobra-prize-desc {
+  font-size: min(2.8vw, 10px);
+  color: #ccc;
+  text-align: center;
+  line-height: 2.4;
+  white-space: pre-line;
+}
+.cobra-prize-stats {
+  font-size: min(2.4vw, 9px);
+  color: #f80;
+  text-align: center;
+  line-height: 2.4;
+  white-space: pre-line;
+}
+
+/* ─── NAME ENTRY ─── */
+.name-entry-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px 4px;
+  flex-shrink: 0;
+}
+.name-entry-label {
+  font-size: min(2.5vw, 9px);
+  color: #0ff;
+}
+.name-input {
+  font-family: 'Press Start 2P', monospace;
+  font-size: min(3.5vw, 13px);
+  background: #000;
+  color: #ff0;
+  border: 2px solid #ff0;
+  padding: 8px 12px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  text-transform: uppercase;
+  caret-color: #ff0;
+  outline: none;
+  touch-action: manipulation;
+}
+.name-input::placeholder { color: #444; }
+
+/* ─── RESULTS ─── */
+.results-body {
+  font-size: min(2.5vw, 9px);
+  color: #aaa;
+  line-height: 2.4;
+  text-align: center;
+  padding: 12px 16px;
+  width: 100%;
+  overflow-y: auto;
+  flex: 1;
+}
+.results-body .highlight { color: #ff0; }
