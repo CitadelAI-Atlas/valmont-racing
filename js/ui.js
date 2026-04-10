@@ -155,6 +155,9 @@ const UI = (() => {
       'OFF-ROAD: ' + _offRoad(car);
 
     const pvs = document.getElementById('car-preview');
+    // Size canvas to match sprite's natural aspect ratio so nothing is clipped
+    const sd = Sprites.get(car.id, 'side');
+    pvs.height = sd ? Math.round(sd.crop.h * (pvs.width / sd.crop.w)) : 220;
     _drawSideSprite(pvs.getContext('2d'), car, pvs.width, pvs.height,
       Math.round(pvs.width / 2), Math.round(pvs.height * 0.67), 2.8);
   }
