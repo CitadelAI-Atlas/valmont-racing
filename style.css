@@ -172,7 +172,7 @@ html, body {
 }
 /* Hero image — natural aspect ratio, no letterboxing */
 #car-preview { image-rendering: auto; width: 100%; height: auto; display: block; }
-.car-name { font-size: min(3.5vw, 13px); color: #0ff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.car-name { font-size: min(3.5vw, 13px); color: #0ff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-top: 8px; }
 .car-desc { font-size: min(2.5vw, 9px); color: #bbb; text-align: center; line-height: 1.9; padding: 5px 0; width: 100%; }
 .car-stats { font-size: min(2.5vw, 9px); color: #ddd; line-height: 2.0; width: 100%; }
 
