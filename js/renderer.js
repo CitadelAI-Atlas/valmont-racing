@@ -112,6 +112,14 @@ const Renderer = (() => {
       n += step;
     }
 
+    // Pre-compute each segment's closest proj index so sprites are drawn
+    // exactly once (fractional stepping can map the same segment multiple times).
+    // proj[0] = n≈1 (closest), so first occurrence = smallest i = correct scale.
+    const segClosest = new Map();
+    for (let i = 0; i < proj.length; i++) {
+      if (!segClosest.has(proj[i].seg)) segClosest.set(proj[i].seg, i);
+    }
+
     // ── Draw far → near (painter's algorithm) ──
     // Each strip is a TRAPEZOID between this segment and the next farther one
     for (let i = proj.length - 1; i >= 0; i--) {
@@ -141,6 +149,9 @@ const Renderer = (() => {
         botY, botMidX, botRoadW);
 
       // ── Sprites ────────────────────────────
+      // Only draw sprites at the closest proj entry for this segment —
+      // duplicate entries (same seg, different fractional n) must not double-render.
+      if (segClosest.get(cur.seg) !== i) continue;
       for (const sprite of cur.seg.sprites) {
         if (sprite.type === 'car' && cur.n < 1.1) continue;
 
