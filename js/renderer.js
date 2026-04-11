@@ -142,7 +142,7 @@ const Renderer = (() => {
 
       // ── Sprites ────────────────────────────
       for (const sprite of cur.seg.sprites) {
-        if (sprite.type === 'car' && cur.n < 2) continue;
+        if (sprite.type === 'car' && cur.n < 1.1) continue;
 
         let sY = cur.screenY, sRW = cur.roadW, sMX = cur.midX;
         let sx, sh, sw;

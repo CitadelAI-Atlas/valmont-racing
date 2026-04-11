@@ -4,7 +4,7 @@
 
 const UI = (() => {
   let currentScreen = 'title';
-  let selectedCarIndex = 0;
+  let selectedCarIndex = 1; // SL550 is index 1 (ferrari at 0 is prize-only)
   let selectedTrackIndex = 0;
   let carPage = 0; // 0 = standard, 1 = prize
 
