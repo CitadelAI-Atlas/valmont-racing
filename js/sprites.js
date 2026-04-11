@@ -21,6 +21,7 @@ const Sprites = (() => {
   // For transparent-background sprites the full image is used (x:0, y:0).
   // For black-background sprites, crop to the car bounds to remove dead space.
   const CROPS = {
+    cobra_side:      { x: 0, y: 0, w: 800,  h: 241 },
     cobra_rear:      { x: 0, y: 0, w: 951,  h: 592, scale: 1.10 },
     Cobra_prize:     { x: 0, y: 0, w: 1024, h: 648 },
     sl550_side:      { x: 0, y: 0, w: 974,  h: 260 },
