@@ -277,31 +277,28 @@ const Renderer = (() => {
       ctx.stroke();
     }
 
-    // ── Speed lines ──────────────────────────
-    // Kick in above 60% throttle; intensity scales with (ratio - 0.6)/0.4.
-    // Nitro mode forces full intensity regardless of actual throttle.
+    // Compute throttle ratio — kept only for internal surface/particle
+    // calculations below. Speed lines themselves are gated purely on nitro
+    // (not throttle) so the "starburst" is reserved as a boost reward.
     const maxS = fx.maxSpeed || 1;
-    let spdR = maxS > 0 ? playerSpeed / maxS : 0;
-    if (fx.nitro) spdR = Math.max(spdR, 1.0);
-    if (spdR > 0.6) {
-      const t = Math.min(1, (spdR - 0.6) / 0.4);
-      const n = 14 + (t * 18) | 0;
-      const cx = W / 2 - playerX * W * 0.1;
-      const cy = horizon + roadH * 0.35;
-      ctx.strokeStyle = `rgba(255,255,255,${(0.18 + t * 0.30).toFixed(2)})`;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      // Deterministic per-frame randomness via seeded RNG keeps streaks stable
-      // frame-to-frame but still varied — offsetting by raceTime-ish value
-      // (use playerZ instead — already frame-advancing & in renderer scope).
+    const spdR = maxS > 0 ? playerSpeed / maxS : 0;
+
+    // ── Speed lines (nitro-only) ─────────────
+    // Short horizontal streaks from the screen edges inward — reads as motion
+    // without the radial-burst arcade filter look. Low count + low alpha.
+    if (fx.nitro) {
+      const n = 10;
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 1;
       const seed = (playerZ * 13) | 0;
+      ctx.beginPath();
       for (let i = 0; i < n; i++) {
-        const a  = ((seed + i * 37) % 1000) / 1000 * Math.PI * 2;
-        const r0 = W * (0.18 + ((i * 17) % 100) / 500);
-        const r1 = r0 + W * (0.10 + t * 0.18);
-        const ca = Math.cos(a), sa = Math.sin(a);
-        ctx.moveTo(cx + ca * r0, cy + sa * r0);
-        ctx.lineTo(cx + ca * r1, cy + sa * r1);
+        const side = i < n / 2 ? -1 : 1;     // half left edge, half right
+        const y    = horizon + ((i * 53) % 100) / 100 * roadH * 0.95;
+        const x0   = side < 0 ? 0 : W;
+        const len  = W * (0.08 + ((seed + i * 17) % 50) / 500);
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x0 + side * -len, y);     // inward toward vanishing point
       }
       ctx.stroke();
     }

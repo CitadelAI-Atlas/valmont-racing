@@ -603,8 +603,16 @@ const Game = (() => {
   }
 
   // ── Hazards ────────────────────────────────
+  // Stationary hazards (oil, potholes, debris, tires, cones, ice) only spawn
+  // on tracks where the player is naturally slowed: off-road tracks with
+  // dirtZones/iceZones, or bumper-to-bumper tracks (trafficDensity >= 0.60).
+  // On fast highway tracks the player has no reaction time, so skip entirely.
   function _spawnHazards() {
     segments.forEach(s => { s.staticSprites.length = 0; });
+    const hasOffroad = (track.dirtZones && track.dirtZones.length) ||
+                       (track.iceZones  && track.iceZones.length);
+    const heavyTraffic = (track.trafficDensity || 0) >= 0.60;
+    if (!hasOffroad && !heavyTraffic) return;
     const types = track.hazards;
     segments.forEach(seg => {
       if (Math.random() > (track.hazardSpawnRate || 0.015)) return;
