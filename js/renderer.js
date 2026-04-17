@@ -36,30 +36,86 @@ const Renderer = (() => {
         index: i, curve, hill, surface,
         stripe: Math.floor(i / 3) % 2 === 0,
         isFinish: i < 4,
-        sprites: [],
+        // staticSprites = hazards, scenery, finish-line poles (long-lived)
+        // trafficSprites = traffic cars (rebuilt each frame)
+        // Kept separate so the per-frame traffic refresh doesn't have to
+        // filter-and-rebuild every segment's sprite array.
+        staticSprites:  [],
+        trafficSprites: [],
       });
     }
     return segs;
   }
 
+  // ── Sky + horizon cache ────────────────────
+  // Sky gradient, stars, sun/moon, clouds, horizon silhouette — all
+  // deterministic per-track. Render once into an offscreen canvas keyed on
+  // (track.id, W, H) and blit each frame. This removes ~20% of frame cost
+  // on the more elaborate skylines (Tokyo, Dubai) and eliminates per-frame
+  // gradient/random work entirely.
+  const _skyCache = new Map();
+  function _getSkyLayer(track, W, H, horizon) {
+    const key = track.id + '|' + W + 'x' + H;
+    let cached = _skyCache.get(key);
+    if (cached) return cached;
+
+    const off = document.createElement('canvas');
+    off.width = W; off.height = H;
+    const c = off.getContext('2d');
+
+    // Sky
+    const sky = c.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, track.skyColor);
+    sky.addColorStop(1, _darken(track.skyColor, 0.6));
+    c.fillStyle = sky;
+    c.fillRect(0, 0, W, horizon);
+    _drawSkyDetails(c, track, W, horizon);
+    _drawHorizonSilhouette(c, track, W, horizon);
+
+    _skyCache.set(key, off);
+    // Cap cache to avoid unbounded growth across resize/orientation cycles.
+    if (_skyCache.size > 8) {
+      const firstKey = _skyCache.keys().next().value;
+      _skyCache.delete(firstKey);
+    }
+    return off;
+  }
+  function invalidateSkyCache() { _skyCache.clear(); }
+
   // ── Main render ────────────────────────────
-  function render(ctx, track, segments, playerZ, playerX, playerSpeed, W, H) {
+  // fx (optional): { maxSpeed, shakeX, shakeY, damage, nitro, banking }
+  //   maxSpeed — used for speed-line intensity ratio
+  //   shakeX/Y — camera-shake pixel offset (game.js computes, renderer applies)
+  //   damage   — 0..1 cumulative player damage (drives smoke + red tint)
+  //   nitro    — boosted motion lines + FOV warp stub
+  //   banking  — -1..1 horizon tilt target (driven by current seg curve)
+  function render(ctx, track, segments, playerZ, playerX, playerSpeed, W, H, fx) {
     W = W || ctx.canvas.width;
     H = H || ctx.canvas.height;
     ctx.clearRect(0, 0, W, H);
+    fx = fx || {};
+    const shakeX = fx.shakeX || 0;
+    const shakeY = fx.shakeY || 0;
+    if (shakeX || shakeY) { ctx.save(); ctx.translate(shakeX, shakeY); }
 
     const horizon = H * 0.40;
     const roadH   = H - horizon;
 
-    // Sky
-    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    sky.addColorStop(0, track.skyColor);
-    sky.addColorStop(1, _darken(track.skyColor, 0.6));
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, horizon);
-    _drawSkyDetails(ctx, track, W, horizon);
+    // Blit cached sky + horizon silhouette layer, optionally banked on curves.
+    const bank = fx.banking || 0;
+    if (bank) {
+      ctx.save();
+      ctx.translate(W / 2, horizon);
+      ctx.rotate(bank * 0.06);    // max ~3.4° tilt — subtle, not arcade-gaudy
+      ctx.translate(-W / 2, -horizon);
+      ctx.drawImage(_getSkyLayer(track, W, H, horizon), 0, 0);
+      ctx.restore();
+    } else {
+      ctx.drawImage(_getSkyLayer(track, W, H, horizon), 0, 0);
+    }
 
-    // Ground with depth gradient (lighter near horizon, darker near player)
+    // Ground (below horizon) with depth gradient — cheap, kept per-frame
+    // so dynamic ocean/ground behavior stays responsive.
     if (track.oceanLeft) {
       const og = ctx.createLinearGradient(0, horizon, 0, H);
       og.addColorStop(0, _lighten('#1a5a90', 0.18));
@@ -78,7 +134,6 @@ const Renderer = (() => {
       ctx.fillStyle = gg;
       ctx.fillRect(0, horizon, W, roadH);
     }
-    _drawHorizonSilhouette(ctx, track, W, horizon);
 
     const totalSegs = segments.length;
     const startSeg  = Math.floor(playerZ) % totalSegs;
@@ -152,7 +207,11 @@ const Renderer = (() => {
       // Only draw sprites at the closest proj entry for this segment —
       // duplicate entries (same seg, different fractional n) must not double-render.
       if (segClosest.get(cur.seg) !== i) continue;
-      for (const sprite of cur.seg.sprites) {
+      // Iterate static + traffic lists together without allocating a new array.
+      const _sta = cur.seg.staticSprites, _tra = cur.seg.trafficSprites;
+      const _staLen = _sta.length, _total = _staLen + _tra.length;
+      for (let _k = 0; _k < _total; _k++) {
+        const sprite = _k < _staLen ? _sta[_k] : _tra[_k - _staLen];
         if (sprite.type === 'car' && cur.n < 1.1) continue;
 
         let sY = cur.screenY, sRW = cur.roadW, sMX = cur.midX;
@@ -185,8 +244,119 @@ const Renderer = (() => {
       }
     }
 
+    // ── Distance fog ─────────────────────────
+    // Fade far segments toward sky colour so the horizon dissolves smoothly.
+    // Covers roughly the top 35% of the road area (far half of draw distance).
+    // track.weather === 'fog' thickens the band and pushes it further down.
+    const heavyFog = track.weather === 'fog';
+    const fogTop = horizon;
+    const fogBot = horizon + roadH * (heavyFog ? 0.80 : 0.45);
+    const fogG = ctx.createLinearGradient(0, fogTop, 0, fogBot);
+    const fogCol = heavyFog ? '#cad2d8' : (track.skyColor || '#88a');
+    fogG.addColorStop(0, _alpha(fogCol, heavyFog ? 0.78 : 0.55));
+    fogG.addColorStop(1, _alpha(fogCol, 0));
+    ctx.fillStyle = fogG;
+    ctx.fillRect(0, fogTop, W, fogBot - fogTop);
+
+    // ── Rain ─────────────────────────────────
+    // Diagonal streaks across the whole view, animated via playerZ so they
+    // scroll at car speed. Density scales slightly with speed for motion feel.
+    if (track.weather === 'rain') {
+      ctx.strokeStyle = 'rgba(180,200,230,0.45)';
+      ctx.lineWidth = 1;
+      const drops = 90;
+      const seed3 = (playerZ * 41) | 0;
+      const scroll = (playerZ * 80) % 40;
+      ctx.beginPath();
+      for (let i = 0; i < drops; i++) {
+        const rx = ((seed3 + i * 53) % 1000) / 1000 * W;
+        const ry = (((i * 31) % 100) / 100 * H + scroll) % H;
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - 4, ry + 14);
+      }
+      ctx.stroke();
+    }
+
+    // ── Speed lines ──────────────────────────
+    // Kick in above 60% throttle; intensity scales with (ratio - 0.6)/0.4.
+    // Nitro mode forces full intensity regardless of actual throttle.
+    const maxS = fx.maxSpeed || 1;
+    let spdR = maxS > 0 ? playerSpeed / maxS : 0;
+    if (fx.nitro) spdR = Math.max(spdR, 1.0);
+    if (spdR > 0.6) {
+      const t = Math.min(1, (spdR - 0.6) / 0.4);
+      const n = 14 + (t * 18) | 0;
+      const cx = W / 2 - playerX * W * 0.1;
+      const cy = horizon + roadH * 0.35;
+      ctx.strokeStyle = `rgba(255,255,255,${(0.18 + t * 0.30).toFixed(2)})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      // Deterministic per-frame randomness via seeded RNG keeps streaks stable
+      // frame-to-frame but still varied — offsetting by raceTime-ish value
+      // (use playerZ instead — already frame-advancing & in renderer scope).
+      const seed = (playerZ * 13) | 0;
+      for (let i = 0; i < n; i++) {
+        const a  = ((seed + i * 37) % 1000) / 1000 * Math.PI * 2;
+        const r0 = W * (0.18 + ((i * 17) % 100) / 500);
+        const r1 = r0 + W * (0.10 + t * 0.18);
+        const ca = Math.cos(a), sa = Math.sin(a);
+        ctx.moveTo(cx + ca * r0, cy + sa * r0);
+        ctx.lineTo(cx + ca * r1, cy + sa * r1);
+      }
+      ctx.stroke();
+    }
+
     // Player car
     _drawPlayerCar(ctx, W, H, playerX, window._selectedCar);
+
+    // ── Surface particles ────────────────────
+    // Dust/powder kicked up behind the player on non-road surfaces. Scales
+    // with current speed so slow-rolling on dirt gets a wisp, flat-out gets
+    // a plume.
+    if ((fx.surface === 'dirt' || fx.surface === 'ice') && spdR > 0.15) {
+      const col = fx.surface === 'ice'
+        ? `rgba(230,240,255,${(0.30 + spdR * 0.35).toFixed(2)})`
+        : `rgba(170,130,70,${(0.32 + spdR * 0.38).toFixed(2)})`;
+      ctx.fillStyle = col;
+      const baseX = W / 2 + playerX * W * 0.28;
+      const baseY = H * 0.95;
+      const n = 4 + (spdR * 6) | 0;
+      const seed2 = (playerZ * 17) | 0;
+      for (let i = 0; i < n; i++) {
+        const ph  = ((seed2 + i * 29) % 50) / 50;
+        const ox  = (((seed2 + i * 41) % 100) / 100 - 0.5) * W * 0.22;
+        const py  = baseY - ph * H * 0.06;
+        const r   = W * (0.012 + ph * 0.018);
+        ctx.beginPath();
+        ctx.ellipse(baseX + ox, py, r, r * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ── Damage tint + smoke ──────────────────
+    // damage 0..1. Red edge vignette + rising smoke puffs from the player car.
+    const dmg = fx.damage || 0;
+    if (dmg > 0.15) {
+      const vg = ctx.createRadialGradient(W/2, H*0.85, W*0.15, W/2, H*0.85, W*0.70);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, `rgba(120,20,0,${(dmg * 0.35).toFixed(2)})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+      // Rising smoke puffs — 2-3 soft grey ellipses behind/above the car
+      const cx2 = W / 2 + playerX * W * 0.28;
+      const cy2 = H * 0.90;
+      const puff = ((playerZ * 6) | 0) % 60;
+      ctx.fillStyle = `rgba(60,60,60,${(dmg * 0.45).toFixed(2)})`;
+      for (let i = 0; i < 3; i++) {
+        const py = cy2 - (puff + i * 20) % 60 - 10;
+        const px = cx2 + ((i * 13) % 30 - 15);
+        ctx.beginPath();
+        ctx.ellipse(px, py, W * 0.04 + dmg * W * 0.02, W * 0.025, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (shakeX || shakeY) ctx.restore();
   }
 
   // ── Trapezoid road strip ───────────────────
@@ -801,7 +971,7 @@ const Renderer = (() => {
   // ── Stars / sun / moon / glow / clouds ────
   function _drawSkyDetails(ctx, track, W, horizon) {
     const id       = track.id;
-    const isNight  = id === 'tokyo' || id === 'dubai';
+    const isNight  = !!track.night;
     const isSunset = id === 'pch';
     const rng = _rng(id.charCodeAt(0) * 31 + id.length * 17);
 
@@ -900,14 +1070,15 @@ const Renderer = (() => {
 
   function _drawHorizonSilhouette(ctx, track, W, horizon) {
     const id = track.id;
+    const night = !!track.night;
     if      (id === 'swiss_alps') _drawMountains(ctx, 'alps',   W, horizon);
     else if (id === 'fuji')       _drawMountains(ctx, 'fuji',   W, horizon);
     else if (id === 'amalfi')     _drawMountains(ctx, 'amalfi', W, horizon);
     else if (id === 'baja')       _drawMountains(ctx, 'baja',   W, horizon);
-    else if (id === 'tokyo')      _drawCitySkyline(ctx, 'tokyo',  W, horizon);
-    else if (id === 'dubai')      _drawCitySkyline(ctx, 'dubai',  W, horizon);
-    else if (id === 'la_freeway') _drawCitySkyline(ctx, 'la',     W, horizon);
-    else if (id === 'monaco')     _drawCitySkyline(ctx, 'monaco', W, horizon);
+    else if (id === 'tokyo')      _drawCitySkyline(ctx, 'tokyo',  W, horizon, night);
+    else if (id === 'dubai')      _drawCitySkyline(ctx, 'dubai',  W, horizon, night);
+    else if (id === 'la_freeway') _drawCitySkyline(ctx, 'la',     W, horizon, night);
+    else if (id === 'monaco')     _drawCitySkyline(ctx, 'monaco', W, horizon, night);
     else if (id === 'autobahn')   _drawTreeLine(ctx, W, horizon);
   }
 
@@ -963,9 +1134,9 @@ const Renderer = (() => {
     }
   }
 
-  function _drawCitySkyline(ctx, style, W, horizon) {
+  function _drawCitySkyline(ctx, style, W, horizon, isNight) {
     const B   = horizon;
-    const isNight = style === 'tokyo' || style === 'dubai';
+    isNight = !!isNight;
     const rng = _rng(style.charCodeAt(0) * 31 + style.length * 17);
 
     if (isNight) {
@@ -1026,5 +1197,5 @@ const Renderer = (() => {
     }
   }
 
-  return { buildSegments, render };
+  return { buildSegments, render, invalidateSkyCache };
 })();

@@ -60,6 +60,7 @@ const TRACKS = [
     id: 'tokyo',
     name: 'Downtown Tokyo',
     tier: 2,
+    night: true,
     description: 'Night racing through neon-lit streets.\nHeavy traffic, oil slicks.',
     setting: 'City night',
     skyColor:   '#050520',
@@ -179,6 +180,7 @@ const TRACKS = [
     id: 'dubai',
     name: 'Dubai Sheikh Zayed',
     tier: 4,
+    night: true,
     description: 'Wide, fast, luxury. Night skyline.\nHigh-speed debris zones.',
     setting: 'City night luxury',
     skyColor:   '#020215',
@@ -204,8 +206,9 @@ const TRACKS = [
     id: 'fuji',
     name: 'Fuji Speedway',
     tier: 4,
-    description: 'Nod to the original. Fast circuit\nwith a legendary final corner.',
-    setting: 'Racetrack day',
+    weather: 'rain',
+    description: 'Nod to the original. Fast circuit\nwith a legendary final corner.\nWet conditions.',
+    setting: 'Racetrack rain',
     skyColor:   '#6688aa',
     groundColor:'#4a7a30',
     roadColor:  '#404040',
@@ -233,7 +236,8 @@ const TRACKS = [
     id: 'amalfi',
     name: 'Amalfi Coast',
     tier: 5,
-    description: 'Impossibly narrow cliff roads. One\nwrong move = into the sea.',
+    weather: 'fog',
+    description: 'Impossibly narrow cliff roads. One\nwrong move = into the sea.\nSea fog.',
     setting: 'Mediterranean cliff',
     skyColor:   '#2266aa',
     groundColor:'#4a8040',
@@ -369,8 +373,18 @@ const UnlockManager = {
     }
   },
 
-  isTrackUnlocked(/* track */) {
-    return true;   // all tracks open during testing
+  isTrackUnlocked(track) {
+    if (!track || !track.unlockRequires) return true;    // tier 1
+    const m = /^tier(\d)$/.exec(track.unlockRequires);
+    if (!m) return true;
+    const reqTier = parseInt(m[1], 10);
+    return this.getUnlocked().includes(reqTier + 1)
+        || this._isTierCompleted(reqTier);
+  },
+
+  _isTierCompleted(tier) {
+    const done = this.getCompleted();
+    return TRACKS.filter(t => t.tier === tier).every(t => done.includes(t.id));
   },
 
   checkAndUnlock(completedTier) {
@@ -405,6 +419,13 @@ const UnlockManager = {
       const raw = localStorage.getItem(this._raceKey);
       return raw ? JSON.parse(raw) : [];
     } catch(e) { return []; }
+  },
+
+  // True only once the player has cleared every track across every tier.
+  // Used by the title screen to show a completion trophy.
+  isAllComplete() {
+    const done = this.getCompleted();
+    return TRACKS.every(t => done.includes(t.id));
   },
 
   resetAll() {
@@ -460,7 +481,11 @@ const Leaderboard = (() => {
     return pts;
   }
 
-  return { record, getTrack, getBest, getTotalPoints };
+  function resetAll() {
+    try { localStorage.removeItem(KEY); } catch(e) {}
+  }
+
+  return { record, getTrack, getBest, getTotalPoints, resetAll };
 })();
 
 // ─── Cobra unlock ──────────────────────────────
@@ -468,4 +493,14 @@ const CobraUnlock = {
   _key: 'vr_cobra_v1',
   isUnlocked() { try { return !!localStorage.getItem(this._key); } catch(e) { return false; } },
   unlock()     { try { localStorage.setItem(this._key, '1');      } catch(e) {} },
+  reset()      { try { localStorage.removeItem(this._key);         } catch(e) {} },
+};
+
+// ─── Full progress reset (invoked from title screen button) ──
+const ProgressReset = {
+  wipe() {
+    UnlockManager.resetAll();
+    Leaderboard.resetAll();
+    CobraUnlock.reset();
+  }
 };

@@ -231,11 +231,66 @@ html, body {
   width: 100%; z-index: 20;
   display: flex; justify-content: space-between;
   padding: 6px 8px;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0,0,0,0.85);
   font-size: min(2.5vw, 9px);
   color: #ff0;
+  text-shadow: 1px 1px 0 #000, 0 0 3px rgba(0,0,0,0.8);
+  border-bottom: 1px solid rgba(255,255,0,0.25);
 }
 .game-hud div { white-space: nowrap; }
+
+/* Thin lap-progress bar directly below the HUD. */
+.lap-progress {
+  position: fixed;
+  top: 28px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(0,0,0,0.55);
+  z-index: 20;
+  pointer-events: none;
+}
+#lap-progress-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #0ff, #ff0);
+  transition: width 0.1s linear, background 0.3s ease;
+}
+/* Sector ticks at 1/3 and 2/3 of the bar. Pseudo-elements avoid extra DOM. */
+.lap-progress::before,
+.lap-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: rgba(255,255,255,0.35);
+  z-index: 1;
+}
+.lap-progress::before { left: 33.33%; }
+.lap-progress::after  { left: 66.66%; }
+.lap-progress { position: fixed; } /* override relative if any */
+
+/* On-screen pause — top-right corner, small target, big enough for a thumb. */
+.pause-btn {
+  position: fixed;
+  top: 34px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  background: rgba(0,0,0,0.55);
+  color: #0ff;
+  border: 1px solid #066;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  line-height: 1;
+  display: none;
+  z-index: 30;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+#screen-game.active .pause-btn { display: block; }
+.pause-btn:active { background: rgba(0,80,80,0.65); color: #fff; }
 
 /* Canvas fills full viewport behind fixed controls */
 #game-canvas {
@@ -319,16 +374,16 @@ html, body {
 #zone-left {
   grid-column: 2; grid-row: 1 / span 2;
   font-size: min(8vw, 30px);
-  color: #2a2a7a;
-  background: rgba(0, 0, 60, 0.18);
+  color: #2a5a7a;
+  background: rgba(0, 30, 60, 0.22);
   border-right: 1px solid #1a1a1a;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 #zone-right {
   grid-column: 3; grid-row: 1 / span 2;
   font-size: min(8vw, 30px);
-  color: #2a2a7a;
-  background: rgba(0, 0, 60, 0.18);
+  color: #5a2a7a;
+  background: rgba(30, 0, 60, 0.22);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -336,7 +391,7 @@ html, body {
 #zone-gas.active   { background: rgba(0, 200, 0, 0.45);   color: #0f0; }
 #zone-brake.active { background: rgba(200, 0, 0, 0.45);   color: #f44; }
 #zone-left.active  { background: rgba(30, 120, 255, 0.45); color: #6cf; }
-#zone-right.active { background: rgba(30, 120, 255, 0.45); color: #6cf; }
+#zone-right.active { background: rgba(160, 40, 240, 0.45); color: #d9b0ff; }
 
 /* ─── COBRA PRIZE ─── */
 #screen-cobra-prize {
@@ -423,3 +478,188 @@ html, body {
   flex: 1;
 }
 .results-body .highlight { color: #ff0; }
+.results-body .all-done { color: #0ff; display: inline-block; margin-top: 4px; }
+.results-body .total-points { color: #f80; }
+.results-body .saved-msg { color: #0ff; }
+.results-body .results-footer { font-size: min(1.8vw, 6px); color: #444; }
+
+/* ─── TITLE TROPHY ─── */
+.title-trophy {
+  margin-top: 14px;
+  text-align: center;
+  color: #ffd700;
+  font-size: min(3vw, 10px);
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px #ff8c00;
+  animation: trophyglow 2s ease-in-out infinite;
+}
+@keyframes trophyglow {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* ─── LEADERBOARD ROWS ─── */
+.lb-head  { color: #555; font-size: min(1.8vw, 6px); }
+.lb-empty { color: #333; font-size: min(1.8vw, 6px); }
+
+/* ─── TRACK CARD DECOR ─── */
+.track-card .track-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 2px 0 3px;
+  image-rendering: pixelated;
+}
+.track-card .done-badge   { font-size: 5px; color: #0f0; margin-top: 2px; }
+.track-card .locked-badge { font-size: 5px; color: #444; margin-top: 2px; }
+
+/* ─── CARD FOCUS (a11y) ─── */
+.car-card:focus-visible,
+.track-card:focus-visible {
+  outline: 2px solid #0ff;
+  outline-offset: 2px;
+}
+
+/* ─── PAUSE OVERLAY ─── */
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.pause-overlay.visible {
+  display: flex;
+}
+.pause-overlay .pause-box {
+  width: min(80vw, 360px);
+  padding: 20px 16px;
+  background: #000;
+  border: 3px solid #0ff;
+  text-align: center;
+}
+.pause-overlay .pause-title {
+  color: #ff0;
+  font-size: min(5vw, 18px);
+  letter-spacing: 3px;
+  margin-bottom: 14px;
+  text-shadow: 2px 2px 0 #f80;
+}
+.pause-overlay .big-btn   { margin-top: 10px; }
+.pause-overlay .small-btn { margin-top: 10px; }
+
+/* ─── NITRO / COMBO / DRAFT HUD ───
+   Shown only while the game screen is active. Kept narrow/fixed so they don't
+   interfere with the touch-zone controls (which cover the bottom half). */
+.nitro-bar {
+  position: fixed;
+  top: 40px;
+  left: 6px;
+  width: 8px;
+  height: 96px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,160,0,0.45);
+  z-index: 20;
+  display: none;
+  overflow: hidden;
+}
+.nitro-bar .nitro-label {
+  position: absolute;
+  bottom: -14px;
+  left: -3px;
+  font-size: 6px;
+  color: #fa0;
+  letter-spacing: 1px;
+}
+.nitro-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(0deg, #f60, #ff0);
+  transition: height 0.08s linear;
+}
+.nitro-bar.full .nitro-fill { box-shadow: 0 0 8px #ff6, inset 0 0 4px #fff; }
+.nitro-bar.active .nitro-fill {
+  background: linear-gradient(0deg, #fff, #f80);
+  animation: nitrogloom 0.12s steps(2) infinite;
+}
+@keyframes nitrogloom {
+  0%, 100% { filter: brightness(1.0); }
+  50%      { filter: brightness(1.6); }
+}
+#screen-game.active .nitro-bar { display: block; }
+
+.combo-pill {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.70);
+  border: 1px solid #ff0;
+  color: #ff0;
+  font-size: min(2.6vw, 9px);
+  letter-spacing: 1px;
+  z-index: 20;
+  display: none;
+}
+.combo-pill.visible { display: block; }
+
+.draft-pill {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  background: rgba(0,0,0,0.60);
+  border: 1px solid #0ff;
+  color: #0ff;
+  font-size: min(2.2vw, 7px);
+  letter-spacing: 1px;
+  z-index: 20;
+  display: none;
+  opacity: 0.9;
+}
+.draft-pill.visible { display: block; }
+
+/* On-screen nitro button — above pause button, same style. */
+.nitro-btn {
+  position: fixed;
+  top: 76px;
+  right: 6px;
+  width: 44px;
+  height: 30px;
+  background: rgba(80,30,0,0.75);
+  border: 1px solid #f80;
+  color: #fa0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  display: none;
+  z-index: 30;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.nitro-btn.ready { color: #ff0; border-color: #ff0; box-shadow: 0 0 6px #ff8; }
+.nitro-btn.firing { background: #f80; color: #fff; }
+#screen-game.active .nitro-btn { display: block; }
+
+/* Traffic minimap — horizontal strip, player at centre, traffic to left/right
+   by relative distance. Thin band, unobtrusive. */
+.minimap {
+  position: fixed;
+  top: 40px;
+  right: 54px;
+  width: 96px;
+  height: 28px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid #444;
+  z-index: 20;
+  display: none;
+  image-rendering: pixelated;
+}
+#screen-game.active .minimap { display: block; }

@@ -3,8 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data:;
+    connect-src 'self';
+    frame-ancestors 'none';
+    base-uri 'self';
+    form-action 'self';
+  " />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <title>VALMONT RACING</title>
-  <link rel="stylesheet" href="style.css?v=74" />
+  <link rel="stylesheet" href="style.css?v=79" />
 </head>
 <body>
 
@@ -14,25 +28,27 @@
       <div class="title-line1">VALMONT</div>
       <div class="title-line2">R A C I N G</div>
     </div>
-    <button class="big-btn blink" id="btn-start">TAP TO START</button>
-    <div class="title-footer">MOBILE OPTIMIZED | M = MUSIC</div>
+    <button class="big-btn blink" id="btn-start" aria-label="Start game">TAP TO START</button>
+    <button class="small-btn" id="btn-reset-progress" aria-label="Reset all progress">RESET PROGRESS</button>
+    <div id="title-trophy" class="title-trophy" style="display:none;">★ GAME COMPLETE ★</div>
+    <div class="title-footer">MOBILE OPTIMIZED | M = MUSIC | ESC/P = PAUSE</div>
   </div>
 
   <!-- CAR SELECT SCREEN -->
   <div id="screen-car-select" class="screen">
     <div class="screen-title">CHOOSE YOUR RIDE</div>
-    <div class="car-page-tabs">
-      <button class="page-tab active" id="btn-page-standard">DRYE FAMILY</button>
-      <button class="page-tab" id="btn-page-prize">PRIZE CARS</button>
+    <div class="car-page-tabs" role="tablist">
+      <button class="page-tab active" id="btn-page-standard" role="tab" aria-selected="true">DRYE FAMILY</button>
+      <button class="page-tab" id="btn-page-prize" role="tab" aria-selected="false">UNLOCKS</button>
     </div>
     <div id="car-grid" class="car-grid"></div>
     <div id="car-detail" class="car-detail">
-      <canvas id="car-preview" width="800" height="200"></canvas>
+      <canvas id="car-preview" width="800" height="200" aria-label="Car preview"></canvas>
       <div id="car-name" class="car-name"></div>
       <div id="car-desc" class="car-desc"></div>
       <div id="car-stats" class="car-stats"></div>
     </div>
-    <button class="big-btn" id="btn-car-confirm">SELECT ▶</button>
+    <button class="big-btn" id="btn-car-confirm" aria-label="Confirm car selection">SELECT ▶</button>
   </div>
 
   <!-- TRACK SELECT SCREEN -->
@@ -45,8 +61,8 @@
       <div id="track-hazards" class="track-hazards"></div>
       <div id="track-leaderboard" class="track-leaderboard"></div>
     </div>
-    <button class="big-btn" id="btn-race">RACE ▶</button>
-    <button class="small-btn" id="btn-back-car">◀ BACK TO CARS</button>
+    <button class="big-btn" id="btn-race" aria-label="Start race">RACE ▶</button>
+    <button class="small-btn" id="btn-back-car" aria-label="Back to car select">◀ BACK TO CARS</button>
   </div>
 
   <!-- GAME SCREEN (qualify + race share one canvas) -->
@@ -56,8 +72,26 @@
       <div id="hud-center"></div>
       <div id="hud-right"></div>
     </div>
-    <canvas id="game-canvas"></canvas>
-    <div id="game-msg" class="game-msg"></div>
+    <div id="lap-progress" class="lap-progress" aria-hidden="true"><div id="lap-progress-fill"></div></div>
+    <div id="nitro-bar" class="nitro-bar" aria-hidden="true">
+      <div id="nitro-fill" class="nitro-fill"></div>
+      <div class="nitro-label">NOS</div>
+    </div>
+    <canvas id="minimap" class="minimap" width="96" height="28" aria-hidden="true"></canvas>
+    <div id="combo-pill" class="combo-pill" aria-hidden="true"></div>
+    <div id="draft-pill" class="draft-pill" aria-hidden="true">DRAFT</div>
+    <button id="btn-nitro" class="nitro-btn" aria-label="Nitro boost">NOS</button>
+    <button id="btn-pause" class="pause-btn" aria-label="Pause game">❚❚</button>
+    <canvas id="game-canvas" aria-label="Race view"></canvas>
+    <div id="game-msg" class="game-msg" role="status" aria-live="polite"></div>
+    <div id="pause-overlay" class="pause-overlay" role="dialog" aria-label="Paused" aria-hidden="true">
+      <div class="pause-box">
+        <div class="pause-title">PAUSED</div>
+        <button class="big-btn" id="btn-pause-resume" aria-label="Resume race">RESUME ▶</button>
+        <button class="big-btn" id="btn-pause-retry" aria-label="Retry race">RETRY ↻</button>
+        <button class="small-btn" id="btn-pause-quit" aria-label="Quit to tracks">QUIT TO TRACKS ◀</button>
+      </div>
+    </div>
     <div class="touch-controls" id="touch-controls">
       <div id="touch-overlay">
         <div id="zone-gas"   class="touch-zone"><span>▲ GAS</span></div>
@@ -71,15 +105,11 @@
   <!-- COBRA PRIZE SCREEN -->
   <div id="screen-cobra-prize" class="screen">
     <div class="cobra-prize-header">★ YOU'VE UNLOCKED A NEW CAR ★</div>
-    <img id="cobra-prize-img" src="sprites/Cobra_prize.png" class="cobra-prize-img" alt="1965 Shelby Cobra 427" />
-    <div class="cobra-prize-name">1965 SHELBY COBRA 427</div>
-    <div class="cobra-prize-desc">The fastest production car for over 20 years.
-No roof, no traction control, no rules!
-The car that scared every manufacturer on earth.</div>
-    <div class="cobra-prize-stats">TOP SPEED ▸ 165 MPH
-ACCEL ▸ 148
-HANDLING ▸ 72</div>
-    <button class="big-btn blink" id="btn-cobra-race">TAKE THE WHEEL ▶</button>
+    <img id="cobra-prize-img" src="sprites/Cobra_prize.png" class="cobra-prize-img" alt="Shelby Cobra" />
+    <div class="cobra-prize-name"></div>
+    <div class="cobra-prize-desc"></div>
+    <div class="cobra-prize-stats"></div>
+    <button class="big-btn blink" id="btn-cobra-race" aria-label="Take the wheel">TAKE THE WHEEL ▶</button>
   </div>
 
   <!-- RESULTS SCREEN -->
@@ -90,39 +120,41 @@ HANDLING ▸ 72</div>
       <div class="name-entry-label">ENTER YOUR NAME:</div>
       <input type="text" id="player-name-input" class="name-input"
              placeholder="RACER" maxlength="14"
-             autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
-      <button class="big-btn" id="btn-save-score">SAVE SCORE ▶</button>
+             autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
+             aria-label="Player name" />
+      <button class="big-btn" id="btn-save-score" aria-label="Save score">SAVE SCORE ▶</button>
     </div>
-    <button class="small-btn" id="btn-continue" style="margin-top:6px;">SKIP ▶</button>
+    <button class="small-btn" id="btn-continue" style="margin-top:6px;" aria-label="Skip saving score">SKIP ▶</button>
   </div>
 
   <script>
-    // Show any JS error visibly on screen so we can diagnose
-    window.onerror = function(msg, src, line, col, err) {
-      var d = document.getElementById('err-overlay');
-      if (!d) {
-        d = document.createElement('div');
-        d.id = 'err-overlay';
-        d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#f00;color:#fff;font-size:11px;padding:8px;z-index:9999;white-space:pre-wrap;word-break:break-all;';
-        document.body.appendChild(d);
-      }
-      d.textContent += (src||'?').split('/').pop() + ':' + line + ' — ' + msg + '\n';
-      return false;
-    };
+    // Debug-only visible error overlay — opt in with ?debug=1 so shipped
+    // builds don't expose internal stack traces to every visitor.
+    if (location.search.indexOf('debug=1') !== -1) {
+      window.onerror = function(msg, src, line) {
+        var d = document.getElementById('err-overlay');
+        if (!d) {
+          d = document.createElement('div');
+          d.id = 'err-overlay';
+          d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#f00;color:#fff;font-size:11px;padding:8px;z-index:9999;white-space:pre-wrap;word-break:break-all;';
+          document.body.appendChild(d);
+        }
+        d.textContent += (src||'?').split('/').pop() + ':' + line + ' — ' + msg + '\n';
+        return false;
+      };
+    }
   </script>
-  <script src="js/audio.js?v=74"></script>
-  <script src="js/sprites.js?v=74"></script>
-  <script src="js/cars.js?v=74"></script>
-  <script src="js/tracks.js?v=74"></script>
-  <script src="js/renderer.js?v=74"></script>
-  <script src="js/ui.js?v=74"></script>
-  <script src="js/game.js?v=74"></script>
+  <script src="js/audio.js?v=79"></script>
+  <script src="js/sprites.js?v=79"></script>
+  <script src="js/cars.js?v=79"></script>
+  <script src="js/tracks.js?v=79"></script>
+  <script src="js/renderer.js?v=79"></script>
+  <script src="js/ui.js?v=79"></script>
+  <script src="js/game.js?v=79"></script>
   <script>
-    // Confirm everything wired up
+    // Confirm the start button wired up (critical — the game can't begin otherwise).
     var btn = document.getElementById('btn-start');
-    if (!btn) {
-      window.onerror('btn-start element not found', 'init', 0);
-    } else {
+    if (btn) {
       btn.addEventListener('touchend', function(e) {
         e.preventDefault();
         btn.click();
