@@ -176,6 +176,29 @@ html, body {
 .car-desc { font-size: min(2.5vw, 9px); color: #bbb; text-align: center; line-height: 1.9; padding: 5px 0; width: 100%; }
 .car-stats { font-size: min(2.5vw, 9px); color: #ddd; line-height: 2.0; width: 100%; }
 
+/* Tuning-preset cycle button — sits between stats and SELECT.
+   Color-codes per preset so the current tune is readable at a glance. */
+.tune-btn {
+  margin-top: 4px;
+  padding: 6px 12px;
+  background: #000;
+  border: 1px solid #888;
+  color: #ccc;
+  font-family: 'Press Start 2P', monospace;
+  font-size: min(2.4vw, 9px);
+  letter-spacing: 1px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tune-btn.preset-stock { border-color: #888; color: #ccc; }
+.tune-btn.preset-race  { border-color: #f44; color: #f66; }
+.tune-btn.preset-rally { border-color: #4a4; color: #6c6; }
+.tune-btn:focus-visible { outline: 2px solid #0ff; outline-offset: 2px; }
+
+/* Stat row shows base + delta when a non-stock preset is active. */
+.car-stats .stat-delta-up   { color: #6f6; }
+.car-stats .stat-delta-down { color: #f66; }
+
 /* ─── TRACK SELECT ─── */
 .track-grid {
   display: grid;

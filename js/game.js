@@ -72,8 +72,10 @@ const Game = (() => {
   // ── Start qualify ──────────────────────────
   function startQualify(trackObj, carObj) {
     track = trackObj;
-    car   = carObj;
-    window._selectedCar   = carObj;
+    // Apply current tuning preset so physics uses tuned stats. Preview/UI
+    // already shows the same values via Tuning.apply in _updateCarDetail.
+    car   = Tuning.apply(carObj);
+    window._selectedCar   = car;
     window._selectedTrack = trackObj;
 
     segments = Renderer.buildSegments(track);
@@ -83,7 +85,7 @@ const Game = (() => {
     _spawnTraffic(track.trafficDensity * 0.5);
 
     playerZ = playerX = playerSpeed = 0;
-    playerMaxSpeed = carObj.topSpeed / 100;
+    playerMaxSpeed = car.topSpeed / 100;
     raceTime = 0; finished = false;
     shakeTime = 0; damage = 0;
     nitro = 0; nitroActive = false; combo = 0; comboTimer = 0; drafting = false;
@@ -97,9 +99,9 @@ const Game = (() => {
 
   function startRace(overrideCar) {
     if (overrideCar) {
-      car = overrideCar;
-      window._selectedCar = overrideCar;
-      playerMaxSpeed = overrideCar.topSpeed / 100;
+      car = Tuning.apply(overrideCar);
+      window._selectedCar = car;
+      playerMaxSpeed = car.topSpeed / 100;
     }
     playerZ = playerX = playerSpeed = 0;
     raceTime = 0; lap = 1;

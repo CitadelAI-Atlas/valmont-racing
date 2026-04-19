@@ -183,20 +183,45 @@ const UI = (() => {
     document.getElementById('car-name').textContent = car.name;
     document.getElementById('car-desc').textContent = car.description;
 
-    // Stats row uses static labels + sanitized bar graphics — safe to keep
-    // innerHTML since _bar / _offRoad only emit block/shade glyphs.
+    // Stats row shows tuned values when a non-stock preset is active so the
+    // bars reflect what the player will actually race with. Deltas render as
+    // coloured ▲/▼ arrows next to each bar.
+    const tuned = Tuning.apply(car);
     const s = document.getElementById('car-stats');
     s.innerHTML =
-      'SPEED:    ' + _bar(car.topSpeed) + '<br>' +
-      'ACCEL:    ' + _bar(car.acceleration) + '<br>' +
-      'HANDLING: ' + _bar(car.handling) + '<br>' +
-      'OFF-ROAD: ' + _offRoad(car);
+      'SPEED:    ' + _bar(tuned.topSpeed)     + _delta(car.topSpeed,     tuned.topSpeed)     + '<br>' +
+      'ACCEL:    ' + _bar(tuned.acceleration) + _delta(car.acceleration, tuned.acceleration) + '<br>' +
+      'HANDLING: ' + _bar(tuned.handling)     + _delta(car.handling,     tuned.handling)     + '<br>' +
+      'OFF-ROAD: ' + _offRoad(tuned);
 
     const pvs = document.getElementById('car-preview');
     const sd = Sprites.get(car.id, 'side');
     pvs.height = sd ? Math.round(sd.crop.h * (pvs.width / sd.crop.w)) : 220;
     _drawSideSprite(pvs.getContext('2d'), car, pvs.width, pvs.height,
       Math.round(pvs.width / 2), Math.round(pvs.height * 0.67), 2.8);
+
+    _refreshTuneButton();
+  }
+
+  // Emit a coloured ▲/▼ delta span next to a stat bar. Empty when no change.
+  // Small whitelist of characters + class names keeps innerHTML safe.
+  function _delta(base, tuned) {
+    const d = tuned - base;
+    if (d === 0) return '';
+    const cls = d > 0 ? 'stat-delta-up' : 'stat-delta-down';
+    const arrow = d > 0 ? '▲' : '▼';
+    return ' <span class="' + cls + '">' + arrow + Math.abs(d) + '</span>';
+  }
+
+  function _refreshTuneButton() {
+    const btn = document.getElementById('btn-tune');
+    if (!btn) return;
+    const car = CARS[selectedCarIndex];
+    const key = Tuning.getPreset(car.id);
+    const preset = Tuning.PRESETS[key];
+    btn.textContent = 'TUNE: ' + preset.label + ' ▸';
+    btn.classList.remove('preset-stock', 'preset-race', 'preset-rally');
+    btn.classList.add('preset-' + key);
   }
 
   function _bar(v) {
@@ -606,6 +631,17 @@ const UI = (() => {
       buildTrackGrid();
       showScreen('trackSelect');
     });
+
+    // TUNE: cycles STOCK → RACE → RALLY on each tap. Refreshes stat bars
+    // in-place so the user sees the delta immediately.
+    const tuneBtn = document.getElementById('btn-tune');
+    if (tuneBtn) {
+      tuneBtn.addEventListener('click', () => {
+        const car = CARS[selectedCarIndex];
+        Tuning.cycle(car.id);
+        _updateCarDetail();
+      });
+    }
 
     document.getElementById('btn-race').addEventListener('click', () => { _goRace(); });
 

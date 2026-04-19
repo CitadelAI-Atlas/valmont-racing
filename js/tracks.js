@@ -496,11 +496,70 @@ const CobraUnlock = {
   reset()      { try { localStorage.removeItem(this._key);         } catch(e) {} },
 };
 
+// ─── Per-car tuning presets (car-select → TUNE button) ──
+// Three presets shift stat points between top speed / accel / handling and
+// adjust dirt penalty. Applied at race start via Tuning.apply(car). Original
+// base stats are untouched — returns a new car-like object.
+const Tuning = (() => {
+  const KEY = 'vr_tuning_v1';
+  const PRESETS = {
+    stock: { label: 'STOCK', dTop: 0,   dAcc: 0,  dHand: 0,   dDirt: 1.00 },
+    race:  { label: 'RACE',  dTop: 10,  dAcc: 8,  dHand: -15, dDirt: 1.25 },
+    rally: { label: 'RALLY', dTop: -10, dAcc: 4,  dHand: 12,  dDirt: 0.55 },
+  };
+  const ORDER = ['stock', 'race', 'rally'];
+
+  function _load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function _save(obj) {
+    try { localStorage.setItem(KEY, JSON.stringify(obj)); } catch (e) {}
+  }
+
+  return {
+    PRESETS, ORDER,
+    getPreset(carId) {
+      const map = _load();
+      return PRESETS[map[carId]] ? map[carId] : 'stock';
+    },
+    setPreset(carId, key) {
+      if (!PRESETS[key]) return;
+      const map = _load();
+      map[carId] = key;
+      _save(map);
+    },
+    cycle(carId) {
+      const cur = this.getPreset(carId);
+      const next = ORDER[(ORDER.indexOf(cur) + 1) % ORDER.length];
+      this.setPreset(carId, next);
+      return next;
+    },
+    // Clamp final stats into a sane range; dirt penalty scales multiplicatively.
+    apply(car) {
+      const p = PRESETS[this.getPreset(car.id)];
+      if (!p || p === PRESETS.stock) return car;
+      const tuned = Object.assign({}, car);
+      tuned.topSpeed     = Math.max(40, Math.min(220, car.topSpeed     + p.dTop));
+      tuned.acceleration = Math.max(10, Math.min(100, car.acceleration + p.dAcc));
+      tuned.handling     = Math.max(10, Math.min(100, car.handling     + p.dHand));
+      if (car.surfacePenalties) {
+        tuned.surfacePenalties = Object.assign({}, car.surfacePenalties);
+        tuned.surfacePenalties.dirt = Math.max(0,
+          Math.min(0.80, (car.surfacePenalties.dirt || 0) * p.dDirt));
+      }
+      return tuned;
+    },
+    resetAll() { try { localStorage.removeItem(KEY); } catch (e) {} },
+  };
+})();
+
 // ─── Full progress reset (invoked from title screen button) ──
 const ProgressReset = {
   wipe() {
     UnlockManager.resetAll();
     Leaderboard.resetAll();
     CobraUnlock.reset();
+    Tuning.resetAll();
   }
 };
