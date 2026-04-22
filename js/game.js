@@ -3,6 +3,9 @@
 //  Portrait-first, single canvas
 // ─────────────────────────────────────────────
 
+// GameConstants lives in tracks.js (renderer.js needs DRAW_DISTANCE/ROAD_WIDTH
+// and loads before game.js).
+
 const Game = (() => {
   let state = 'idle'; // idle | qualify | race | paused
   let track = null;
@@ -41,6 +44,11 @@ const Game = (() => {
   let nitro = 0, nitroActive = false, combo = 0, comboTimer = 0, drafting = false;
   // Debounces nitro key → one activation per keypress instead of per frame.
   let _nitroPressed = false;
+
+  // Reduced-motion detection (cached; live media query avoids stale reads
+  // if the user toggles the OS setting mid-session).
+  const _motionMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function _prefersReducedMotion() { return !!(_motionMQ && _motionMQ.matches); }
 
   // ── Canvas sizing (portrait) ───────────────
   function _sizeCanvas() {
@@ -111,8 +119,9 @@ const Game = (() => {
     nitro = 0; nitroActive = false; combo = 0; comboTimer = 0; drafting = false;
     // Starting grid position is a soft tier scale; _updatePosition() will
     // re-rank live each frame based on traffic actually passed/ahead.
-    const tier = track.tier || 3;
-    position = tier <= 1 ? 2 : tier <= 2 ? 4 : tier <= 3 ? 6 : 8;
+    const tier = track.tier || GameConstants.DEFAULT_TIER;
+    const rule = TIER_RULES[tier] || TIER_RULES[GameConstants.DEFAULT_TIER];
+    position = rule.gridPos;
 
     bestTime = (Leaderboard.getBest(track.id) || {}).time || null;
 
@@ -258,8 +267,9 @@ const Game = (() => {
     }
 
     // Qualify time scales with tier — beginners get more time
-    const tierMult  = track.tier <= 1 ? 2.0 : track.tier <= 2 ? 1.5 : 1.2;
-    const speedMult = 118 / car.topSpeed;   // slower cars get proportionally more time
+    const tier = track.tier || GameConstants.DEFAULT_TIER;
+    const tierMult  = (TIER_RULES[tier] || TIER_RULES[GameConstants.DEFAULT_TIER]).qualifyMult;
+    const speedMult = GameConstants.QUALIFY_SPEED_REF / car.topSpeed;   // slower cars get proportionally more time
     if (mode === 'qualify' && raceTime > track.qualifyTime * tierMult * speedMult) {
       UI.showMsg('TIME UP!');
       if (pendingRaceStart) clearTimeout(pendingRaceStart);
@@ -303,9 +313,11 @@ const Game = (() => {
     const H = canvas._lh || canvas.height;
 
     // Compute shake offset from remaining shakeTime; random per-frame so it
-    // actually looks like shake, not drift.
+    // actually looks like shake, not drift. Suppressed when the player has
+    // prefers-reduced-motion — screen shake is exactly the kind of motion
+    // that triggers motion-sickness symptoms.
     let sx = 0, sy = 0;
-    if (shakeTime > 0) {
+    if (shakeTime > 0 && !_prefersReducedMotion()) {
       const amp = Math.min(1, shakeTime) * 14;
       sx = (Math.random() - 0.5) * amp;
       sy = (Math.random() - 0.5) * amp * 0.5;
@@ -325,6 +337,7 @@ const Game = (() => {
       damage, banking: bank,
       surface,
       nitro: nitroActive,
+      reducedMotion: _prefersReducedMotion(),
     });
     _drawMinimap();
   }
@@ -333,8 +346,8 @@ const Game = (() => {
   // Horizontal strip, player at centre. Traffic within ±30 segments shown as
   // small squares positioned left (behind) or right (ahead) of the player.
   // Colour: red = ahead, yellow = just ahead, cyan = behind.
-  const _MINIMAP_RANGE = 30;
   function _drawMinimap() {
+    const RANGE = GameConstants.MINIMAP_RANGE;
     const mm = document.getElementById('minimap');
     if (!mm) return;
     const mctx = mm.getContext('2d');
@@ -351,8 +364,8 @@ const Game = (() => {
       const tc = trafficCars[i];
       let d = ((tc.z - playerZ + L) % L);
       if (d > L / 2) d -= L;   // signed distance: negative = behind
-      if (Math.abs(d) > _MINIMAP_RANGE) continue;
-      const fx = (d / _MINIMAP_RANGE) * (mw / 2 - 2);
+      if (Math.abs(d) > RANGE) continue;
+      const fx = (d / RANGE) * (mw / 2 - 2);
       const x = Math.round(mw / 2 + fx);
       // Lane offset mirrored as small Y offset so lane position is visible too
       const y = Math.round(mh / 2 + tc.x * (mh / 2 - 2));
@@ -372,66 +385,41 @@ const Game = (() => {
   }
 
   // ── Scenery (roadside objects) ─────────────
-  const SCENERY_MAP = {
-    route66:    ['billboard', 'cactus', 'barn'],
-    pch:        ['palm', 'billboard'],
-    tokyo:      ['building'],
-    la_freeway: ['building', 'billboard'],
-    monaco:     ['building'],
-    swiss_alps: ['tree', 'boulder'],
-    dubai:      ['building', 'billboard'],
-    fuji:       ['tree', 'billboard'],
-    amalfi:     ['building', 'boulder'],
-    baja:       ['cactus', 'boulder'],
-    autobahn:   ['tree', 'billboard'],
-    nullarbor:  ['billboard'],
+  // Scenery type list comes from track.scenery (tracks.js). Scales below are
+  // shared because they describe sprite geometry, not track aesthetics.
+  // hScale and wRatio are multipliers on the base road-proportional sprite
+  // size; hScale * wRatio must stay well under 2.28 to avoid overlapping the
+  // road edge.
+  const SCENERY_SCALES = {
+    building:  { h: 1.2, w: 0.7 },
+    cactus:    { h: 1.0, w: 0.35 },
+    tree:      { h: 1.2, w: 0.8 },
+    palm:      { h: 1.4, w: 0.45 },
+    billboard: { h: 0.8, w: 1.2 },
+    boulder:   { h: 0.45, w: 0.8 },
+    barn:      { h: 1.1, w: 0.9 },
   };
 
   function _spawnScenery() {
-    const types = SCENERY_MAP[track.id] || ['billboard'];
-    // hScale and wRatio are multipliers on the base road-proportional sprite size.
-    // hScale * wRatio must stay well under 2.28 to avoid overlapping the road edge.
-    const SCALES = {
-      building:  { h: 1.2, w: 0.7 },
-      cactus:    { h: 1.0, w: 0.35 },
-      tree:      { h: 1.2, w: 0.8 },
-      palm:      { h: 1.4, w: 0.45 },
-      billboard: { h: 0.8, w: 1.2 },
-      boulder:   { h: 0.45, w: 0.8 },
-      barn:      { h: 1.1, w: 0.9 },
-    };
+    const types = track.scenery;   // always present — TRACK_DEFAULTS fills it in
     segments.forEach((seg, i) => {
-      if (i % 40 !== 0) return;
-      // Each side independently at 55% probability — sparse, not wall-to-wall
-      if (Math.random() < 0.55) {
+      if (i % GameConstants.SCENERY_STEP !== 0) return;
+      // Each side independently — sparse, not wall-to-wall
+      if (Math.random() < GameConstants.SCENERY_PROB) {
         const lt = types[Math.floor(Math.random() * types.length)];
-        const ls = SCALES[lt] || { h: 1.0, w: 0.8 };
+        const ls = SCENERY_SCALES[lt] || { h: 1.0, w: 0.8 };
         seg.staticSprites.push({ type: lt, lane: -(3.5 + Math.random() * 0.8), hScale: ls.h, wRatio: ls.w });
       }
-      if (Math.random() < 0.55) {
+      if (Math.random() < GameConstants.SCENERY_PROB) {
         const rt = types[Math.floor(Math.random() * types.length)];
-        const rs = SCALES[rt] || { h: 1.0, w: 0.8 };
+        const rs = SCENERY_SCALES[rt] || { h: 1.0, w: 0.8 };
         seg.staticSprites.push({ type: rt, lane:  (3.5 + Math.random() * 0.8), hScale: rs.h, wRatio: rs.w });
       }
     });
   }
 
   // ── Traffic ────────────────────────────────
-  const TRACK_TRAFFIC = {
-    route66:    ['Sport01','Comfort01','Highway01','OffRoad01'],
-    pch:        ['Sport01','Sport02','Comfort01','OffRoad01'],
-    tokyo:      ['Sport01','Sport02','Sport03','Comfort01'],
-    la_freeway: ['Sport01','Sport02','Comfort01','Highway01'],
-    monaco:     ['Sport02','Sport03','Comfort01'],
-    swiss_alps: ['OffRoad01','OffRoad02','Comfort01'],
-    dubai:      ['Sport02','Sport03','Comfort01'],
-    fuji:       ['Sport01','Sport02','Sport03'],
-    amalfi:     ['Sport01','Comfort01','OffRoad01'],
-    baja:       ['OffRoad01','OffRoad02','Highway01'],
-    autobahn:   ['Sport02','Sport03','Highway01','Comfort01'],
-    nullarbor:  ['OffRoad01','OffRoad02','Highway01','Comfort01'],
-  };
-
+  // Per-track traffic pool lives on track.trafficPool (see tracks.js).
   // Speed ranges in mph / 100 (same units as playerSpeed).
   // Traffic moves at tc.speed * 90 * dt — identical scale to the player.
   // Sport cars can exceed slower player cars and will steer around them.
@@ -447,9 +435,8 @@ const Game = (() => {
 
   function _spawnTraffic(density) {
     trafficCars = [];
-    const count = Math.floor(segments.length * density * 0.025);
-    const pool  = (TRACK_TRAFFIC[track.id] || ['Sport01','Comfort01','Highway01'])
-                    .map(id => ({ spriteId: id }));
+    const count = Math.floor(segments.length * density * GameConstants.TRAFFIC_PER_SEG);
+    const pool  = track.trafficPool.map(id => ({ spriteId: id }));
     for (let i = 0; i < count; i++) {
       const carDef = pool[i % pool.length];
       const spd    = TRAFFIC_SPEEDS[carDef.spriteId] || { min: 0.55, max: 0.85 };
@@ -549,7 +536,6 @@ const Game = (() => {
   // Rank = 1 + (traffic cars currently ahead within half a lap). This gives a
   // responsive HUD indicator that rises as the player overtakes traffic and
   // falls if traffic passes them.
-  const _TOTAL_RACERS = 8;
   function _updatePosition() {
     if (!trafficCars.length) { position = 1; return; }
     const L = segments.length, half = L / 2;
@@ -558,8 +544,8 @@ const Game = (() => {
       const d = ((trafficCars[i].z - playerZ) + L) % L;
       if (d > 0 && d < half) ahead++;
     }
-    // Clamp into [1 .. _TOTAL_RACERS] so the HUD never shows P0 or P9+.
-    const rank = Math.min(_TOTAL_RACERS, 1 + ahead);
+    // Clamp into [1 .. TOTAL_RACERS] so the HUD never shows P0 or P9+.
+    const rank = Math.min(GameConstants.TOTAL_RACERS, 1 + ahead);
     // Smooth toward target so position doesn't flicker on sprite-level passes.
     // Only show integer positions in the HUD — updateHUD rounds via |0.
     position += (rank - position) * 0.15;
@@ -613,11 +599,12 @@ const Game = (() => {
     segments.forEach(s => { s.staticSprites.length = 0; });
     const hasOffroad = (track.dirtZones && track.dirtZones.length) ||
                        (track.iceZones  && track.iceZones.length);
-    const heavyTraffic = (track.trafficDensity || 0) >= 0.60;
+    const heavyTraffic = (track.trafficDensity || 0) >= GameConstants.HEAVY_TRAFFIC;
     if (!hasOffroad && !heavyTraffic) return;
     const types = track.hazards;
+    const rate  = track.hazardSpawnRate != null ? track.hazardSpawnRate : GameConstants.HAZARD_DEFAULT;
     segments.forEach(seg => {
-      if (Math.random() > (track.hazardSpawnRate || 0.015)) return;
+      if (Math.random() > rate) return;
       const ht = types[Math.floor(Math.random() * types.length)];
       const lane = (Math.random() - 0.5) * 1.6;
       let st = null;
@@ -737,16 +724,16 @@ const Game = (() => {
     UI.showMsg('QUALIFIED!\nGRID POS ' + position);
     if (pendingRaceStart) clearTimeout(pendingRaceStart);
 
-    if (track.cobraPrize) {
-      // Always show Cobra prize screen before Autobahn race
-      if (!CobraUnlock.isUnlocked()) CobraUnlock.unlock();
-      const cobra = CARS.find(c => c.id === 'cobra');
+    const prizeCar = track.prizeCarId ? CARS.find(c => c.id === track.prizeCarId) : null;
+    if (prizeCar) {
+      // Show prize-car reveal screen before the race on prize-linked tracks.
+      if (!PrizeUnlock.isUnlocked(prizeCar.id)) PrizeUnlock.unlock(prizeCar.id);
       pendingRaceStart = setTimeout(() => {
         pendingRaceStart = null;
-        UI.showCobraPrize(() => {
+        UI.showPrizeUnlock(prizeCar, () => {
           UI.showScreen('game');
           UI.showMsg('RACE\nSTART!');
-          startRace(cobra);
+          startRace(prizeCar);
         });
       }, 2000);
     } else {
@@ -776,7 +763,7 @@ const Game = (() => {
       trackId: track.id,
       trackName: track.name,
       carName: car.name + ' (' + car.color + ')',
-      time: raceTime, position, totalCars: _TOTAL_RACERS,
+      time: raceTime, position, totalCars: GameConstants.TOTAL_RACERS,
       laps: lap - 1, totalLaps, newUnlock,
     });
   }
@@ -894,5 +881,28 @@ const Game = (() => {
     return Math.max(0, Math.min(1, lapFrac));
   }
 
-  return { startQualify, startRace, togglePause, restartRace, quitToTracks, getLapProgress };
+  // Snapshot of race/physics state for the debug error overlay. Kept cheap —
+  // no allocations beyond the one object literal so it's safe to call from
+  // window.onerror. Returns primitives only (no segment / track refs).
+  function getDebugSnapshot() {
+    return {
+      state,
+      track: track && track.id || null,
+      car:   car && car.id || null,
+      playerZ: Math.round(playerZ),
+      playerX: Number((playerX || 0).toFixed(2)),
+      playerSpeed: Math.round(playerSpeed),
+      lap, totalLaps,
+      raceTime: Number((raceTime || 0).toFixed(2)),
+      finished, position,
+      damage: Number((damage || 0).toFixed(2)),
+      shakeTime: Number((shakeTime || 0).toFixed(2)),
+      nitro: Number((nitro || 0).toFixed(2)),
+      nitroActive, combo, drafting,
+      trafficCount: trafficCars ? trafficCars.length : 0,
+      segmentCount: segments ? segments.length : 0,
+    };
+  }
+
+  return { startQualify, startRace, togglePause, restartRace, quitToTracks, getLapProgress, getDebugSnapshot };
 })();

@@ -47,28 +47,46 @@ const Sprites = (() => {
     Highway01:       { x: 0, y: 0, w: 533,  h: 677 },
   };
 
-  const FILES = Object.keys(CROPS);
+  // Eager preload set: only the car-select side views for non-prize cars.
+  // Rear views (race only), traffic sprites, and prize renders are lazy —
+  // fetched the first time someone asks for them. Keeps initial page weight
+  // lean and avoids the network spike of 21 parallel PNG requests at boot.
+  const EAGER_KEYS = [
+    'sl550_side', 'cls550_side', 'gx460_side', 'gx470_side', 'raptor_side',
+  ];
 
-  FILES.forEach(key => {
+  function _load(key) {
+    if (_imgs[key]) return;                // already started or finished
+    if (!CROPS[key]) return;               // unknown key — ignore
     const img = new Image();
     img.onload  = () => { _ok[key] = true; };
     img.onerror = () => { /* silently fall back to hand-coded art */ };
     img.src = 'sprites/' + key + '.png';
     _imgs[key] = img;
-  });
+  }
 
-  // Returns { img, crop } for (carId, 'side'|'rear'), or null.
+  EAGER_KEYS.forEach(_load);
+
+  // Returns { img, crop } for (carId, 'side'|'rear'), or null. Triggers a
+  // lazy load the first time a key is requested.
   function get(carId, view) {
     const key = carId + '_' + view;
+    if (!_imgs[key]) _load(key);
     if (!_ok[key]) return null;
     return { img: _imgs[key], crop: CROPS[key] };
   }
 
   // Returns { img, crop } for traffic sprite keys (Sport01, Highway01, etc.), or null.
   function getTraffic(key) {
+    if (!_imgs[key]) _load(key);
     if (!_ok[key]) return null;
     return { img: _imgs[key], crop: CROPS[key] };
   }
 
-  return { get, getTraffic };
+  // Optional warm-up hook — callers (e.g. car select screen) can ask us to
+  // start fetching a set of keys before they're first rendered, trading a
+  // tiny bit of bandwidth for a smoother reveal.
+  function warmup(keys) { keys.forEach(_load); }
+
+  return { get, getTraffic, warmup };
 })();

@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <title>VALMONT RACING</title>
-  <link rel="stylesheet" href="style.css?v=81" />
+  <link rel="stylesheet" href="style.css?v=83" />
 </head>
 <body>
 
@@ -32,6 +32,18 @@
     <button class="small-btn" id="btn-reset-progress" aria-label="Reset all progress">RESET PROGRESS</button>
     <div id="title-trophy" class="title-trophy" style="display:none;">★ GAME COMPLETE ★</div>
     <div class="title-footer">MOBILE OPTIMIZED | M = MUSIC | ESC/P = PAUSE</div>
+  </div>
+
+  <!-- Generic confirm dialog (hidden by default, shown via UI.confirm) -->
+  <div id="confirm-overlay" class="confirm-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="confirm-box">
+      <div class="confirm-title" id="confirm-title">ARE YOU SURE?</div>
+      <div class="confirm-body" id="confirm-body"></div>
+      <div class="confirm-actions">
+        <button class="big-btn" id="btn-confirm-ok" aria-label="Confirm">CONFIRM ▶</button>
+        <button class="small-btn" id="btn-confirm-cancel" aria-label="Cancel">CANCEL ◀</button>
+      </div>
+    </div>
   </div>
 
   <!-- CAR SELECT SCREEN -->
@@ -103,14 +115,14 @@
     </div>
   </div>
 
-  <!-- COBRA PRIZE SCREEN -->
-  <div id="screen-cobra-prize" class="screen">
-    <div class="cobra-prize-header">★ YOU'VE UNLOCKED A NEW CAR ★</div>
-    <img id="cobra-prize-img" src="sprites/Cobra_prize.png" class="cobra-prize-img" alt="Shelby Cobra" />
-    <div class="cobra-prize-name"></div>
-    <div class="cobra-prize-desc"></div>
-    <div class="cobra-prize-stats"></div>
-    <button class="big-btn blink" id="btn-cobra-race" aria-label="Take the wheel">TAKE THE WHEEL ▶</button>
+  <!-- PRIZE UNLOCK SCREEN (shared by any prize-gated car) -->
+  <div id="screen-prize-unlock" class="screen">
+    <div class="prize-unlock-header">★ YOU'VE UNLOCKED A NEW CAR ★</div>
+    <img id="prize-unlock-img" class="prize-unlock-img" alt="Prize car" />
+    <div class="prize-unlock-name"></div>
+    <div class="prize-unlock-desc"></div>
+    <div class="prize-unlock-stats"></div>
+    <button class="big-btn blink" id="btn-prize-race" aria-label="Take the wheel">TAKE THE WHEEL ▶</button>
   </div>
 
   <!-- RESULTS SCREEN -->
@@ -130,28 +142,35 @@
 
   <script>
     // Debug-only visible error overlay — opt in with ?debug=1 so shipped
-    // builds don't expose internal stack traces to every visitor.
+    // builds don't expose internal stack traces to every visitor. When an
+    // error fires mid-race, also dump Game's state snapshot so crash reports
+    // include the physics context, not just the exception text.
     if (location.search.indexOf('debug=1') !== -1) {
       window.onerror = function(msg, src, line) {
         var d = document.getElementById('err-overlay');
         if (!d) {
           d = document.createElement('div');
           d.id = 'err-overlay';
-          d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#f00;color:#fff;font-size:11px;padding:8px;z-index:9999;white-space:pre-wrap;word-break:break-all;';
+          d.style.cssText = 'position:fixed;top:0;left:0;width:100%;max-height:50vh;overflow:auto;background:#f00;color:#fff;font-size:11px;padding:8px;z-index:9999;white-space:pre-wrap;word-break:break-all;';
           document.body.appendChild(d);
         }
         d.textContent += (src||'?').split('/').pop() + ':' + line + ' — ' + msg + '\n';
+        try {
+          if (typeof Game !== 'undefined' && Game.getDebugSnapshot) {
+            d.textContent += '  state: ' + JSON.stringify(Game.getDebugSnapshot()) + '\n';
+          }
+        } catch(e) { /* snapshot must never mask the original error */ }
         return false;
       };
     }
   </script>
-  <script src="js/audio.js?v=81"></script>
-  <script src="js/sprites.js?v=81"></script>
-  <script src="js/cars.js?v=81"></script>
-  <script src="js/tracks.js?v=81"></script>
-  <script src="js/renderer.js?v=81"></script>
-  <script src="js/ui.js?v=81"></script>
-  <script src="js/game.js?v=81"></script>
+  <script src="js/audio.js?v=83"></script>
+  <script src="js/sprites.js?v=83"></script>
+  <script src="js/cars.js?v=83"></script>
+  <script src="js/tracks.js?v=83"></script>
+  <script src="js/renderer.js?v=83"></script>
+  <script src="js/ui.js?v=83"></script>
+  <script src="js/game.js?v=83"></script>
   <script>
     // Confirm the start button wired up (critical — the game can't begin otherwise).
     var btn = document.getElementById('btn-start');

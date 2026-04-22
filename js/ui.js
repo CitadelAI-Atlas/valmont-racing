@@ -13,7 +13,7 @@ const UI = (() => {
     carSelect:   document.getElementById('screen-car-select'),
     trackSelect: document.getElementById('screen-track-select'),
     game:        document.getElementById('screen-game'),
-    cobraPrize:  document.getElementById('screen-cobra-prize'),
+    prizeUnlock: document.getElementById('screen-prize-unlock'),
     results:     document.getElementById('screen-results'),
   };
 
@@ -139,10 +139,11 @@ const UI = (() => {
       });
     } else {
       const prizeCars = CARS.map((car, i) => ({ car, i })).filter(({ car }) => car.hidden);
-      const cobraUnlocked = CobraUnlock.isUnlocked();
 
       function _isCarUnlocked(car) {
-        if (car.id === 'cobra') return cobraUnlocked;
+        // Hidden cars with prizeUnlock gate behind the PrizeUnlock registry.
+        // Other hidden cars (none today, but future-proof) are always available.
+        if (car.prizeUnlock) return PrizeUnlock.isUnlocked(car.id);
         return true;
       }
 
@@ -185,14 +186,18 @@ const UI = (() => {
 
     // Stats row shows tuned values when a non-stock preset is active so the
     // bars reflect what the player will actually race with. Deltas render as
-    // coloured ▲/▼ arrows next to each bar.
+    // coloured ▲/▼ arrows next to each bar. Built via DOM nodes so no user-
+    // sourced value would ever land in innerHTML (defence in depth — car
+    // stats are all config today, but the pattern stays safe if that changes).
     const tuned = Tuning.apply(car);
     const s = document.getElementById('car-stats');
-    s.innerHTML =
-      'SPEED:    ' + _bar(tuned.topSpeed)     + _delta(car.topSpeed,     tuned.topSpeed)     + '<br>' +
-      'ACCEL:    ' + _bar(tuned.acceleration) + _delta(car.acceleration, tuned.acceleration) + '<br>' +
-      'HANDLING: ' + _bar(tuned.handling)     + _delta(car.handling,     tuned.handling)     + '<br>' +
-      'OFF-ROAD: ' + _offRoad(tuned);
+    s.textContent = '';
+    _appendStatRow(s, 'SPEED:    ', tuned.topSpeed,     car.topSpeed);
+    _appendStatRow(s, 'ACCEL:    ', tuned.acceleration, car.acceleration);
+    _appendStatRow(s, 'HANDLING: ', tuned.handling,     car.handling);
+    const offRow = document.createElement('div');
+    offRow.textContent = 'OFF-ROAD: ' + _offRoad(tuned);
+    s.appendChild(offRow);
 
     const pvs = document.getElementById('car-preview');
     const sd = Sprites.get(car.id, 'side');
@@ -203,14 +208,18 @@ const UI = (() => {
     _refreshTuneButton();
   }
 
-  // Emit a coloured ▲/▼ delta span next to a stat bar. Empty when no change.
-  // Small whitelist of characters + class names keeps innerHTML safe.
-  function _delta(base, tuned) {
-    const d = tuned - base;
-    if (d === 0) return '';
-    const cls = d > 0 ? 'stat-delta-up' : 'stat-delta-down';
-    const arrow = d > 0 ? '▲' : '▼';
-    return ' <span class="' + cls + '">' + arrow + Math.abs(d) + '</span>';
+  // Build one stat row: label + bar text node + optional coloured delta span.
+  function _appendStatRow(parent, label, tunedVal, baseVal) {
+    const row = document.createElement('div');
+    row.appendChild(document.createTextNode(label + _bar(tunedVal)));
+    const d = tunedVal - baseVal;
+    if (d !== 0) {
+      const span = document.createElement('span');
+      span.className = d > 0 ? 'stat-delta-up' : 'stat-delta-down';
+      span.textContent = ' ' + (d > 0 ? '▲' : '▼') + Math.abs(d);
+      row.appendChild(span);
+    }
+    parent.appendChild(row);
   }
 
   function _refreshTuneButton() {
@@ -271,9 +280,20 @@ const UI = (() => {
     return cvs;
   }
 
+  let _trackCards = [];
+
+  function _selectTrack(i) {
+    selectedTrackIndex = i;
+    _trackCards.forEach(entry => {
+      entry.card.classList.toggle('selected', entry.index === i);
+    });
+    _updateTrackDetail();
+  }
+
   function buildTrackGrid() {
     const grid = document.getElementById('track-grid');
     grid.textContent = '';
+    _trackCards = [];
     const completed = UnlockManager.getCompleted();
 
     TRACKS.forEach((track, i) => {
@@ -320,11 +340,12 @@ const UI = (() => {
       }
 
       if (ok) {
-        const pick = () => { selectedTrackIndex = i; buildTrackGrid(); };
+        const pick = () => { _selectTrack(i); };
         card.addEventListener('click', pick);
         card.addEventListener('keydown', e => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
         });
+        _trackCards.push({ card, index: i });
       }
       grid.appendChild(card);
     });
@@ -390,7 +411,7 @@ const UI = (() => {
   }
 
   function goToTrackSelect() {
-    if (_resultsTimer) { clearTimeout(_resultsTimer); _resultsTimer = null; }
+    _stopResultsCountdown();
     buildTrackGrid();
     showScreen('trackSelect');
   }
@@ -419,7 +440,7 @@ const UI = (() => {
     back.textContent = 'RETURNING TO TRACKS...';
     body.appendChild(back);
 
-    if (_resultsTimer) clearTimeout(_resultsTimer);
+    _stopResultsCountdown();
     _resultsTimer = setTimeout(goToTrackSelect, 2500);
   }
 
@@ -484,16 +505,43 @@ const UI = (() => {
       _pendingResult = data;
       nameInput.value = '';
       nameRow.style.display = 'flex';
-      if (_resultsTimer) clearTimeout(_resultsTimer);
-      _resultsTimer = setTimeout(_saveAndAdvance, 10000);
+      _startResultsCountdown(GameConstants.RESULTS_AUTOSAVE_MS, _saveAndAdvance);
     } else {
       _pendingResult = null;
       nameRow.style.display = 'none';
-      if (_resultsTimer) clearTimeout(_resultsTimer);
-      _resultsTimer = setTimeout(goToTrackSelect, 4000);
+      _startResultsCountdown(4000, goToTrackSelect);
     }
 
     showScreen('results');
+  }
+
+  // Run the results timer while updating the SKIP button label with a live
+  // countdown. A single interval drives both the timeout and the UI so they
+  // can't drift apart.
+  let _resultsCountdownInterval = null;
+  function _startResultsCountdown(ms, onExpire) {
+    if (_resultsTimer) { clearTimeout(_resultsTimer); _resultsTimer = null; }
+    if (_resultsCountdownInterval) { clearInterval(_resultsCountdownInterval); _resultsCountdownInterval = null; }
+    const btn = document.getElementById('btn-continue');
+    const deadline = Date.now() + ms;
+    const render = () => {
+      if (!btn) return;
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      btn.textContent = remaining > 0 ? ('SKIP ▶ (' + remaining + 's)') : 'SKIP ▶';
+    };
+    render();
+    _resultsCountdownInterval = setInterval(render, 250);
+    _resultsTimer = setTimeout(() => {
+      if (_resultsCountdownInterval) { clearInterval(_resultsCountdownInterval); _resultsCountdownInterval = null; }
+      if (btn) btn.textContent = 'SKIP ▶';
+      onExpire();
+    }, ms);
+  }
+  function _stopResultsCountdown() {
+    if (_resultsTimer) { clearTimeout(_resultsTimer); _resultsTimer = null; }
+    if (_resultsCountdownInterval) { clearInterval(_resultsCountdownInterval); _resultsCountdownInterval = null; }
+    const btn = document.getElementById('btn-continue');
+    if (btn) btn.textContent = 'SKIP ▶';
   }
 
   function _fmtTime(s) {
@@ -503,55 +551,85 @@ const UI = (() => {
   }
 
   // ── HUD ────────────────────────────────────
+  // Cache DOM refs once — updateHUD runs every frame so getElementById
+  // overhead adds up. Also diff each field against the last written value
+  // to avoid no-op textContent writes that still trigger layout work.
+  const _hud = {};
+  function _hudEls() {
+    if (_hud.l) return _hud;
+    _hud.l       = document.getElementById('hud-left');
+    _hud.c       = document.getElementById('hud-center');
+    _hud.r       = document.getElementById('hud-right');
+    _hud.fill    = document.getElementById('lap-progress-fill');
+    _hud.nb      = document.getElementById('nitro-bar');
+    _hud.nf      = document.getElementById('nitro-fill');
+    _hud.btn     = document.getElementById('btn-nitro');
+    _hud.cp      = document.getElementById('combo-pill');
+    _hud.dp      = document.getElementById('draft-pill');
+    return _hud;
+  }
+  const _lastHUD = { l: null, c: null, r: null, fillPct: null, fillCol: null,
+    nitroPct: null, nbActive: null, nbFull: null, btnReady: null, btnFiring: null,
+    comboText: null, comboShow: null, draftShow: null };
+
+  function _setText(el, key, value) {
+    if (!el || _lastHUD[key] === value) return;
+    _lastHUD[key] = value;
+    el.textContent = value;
+  }
+
   function updateHUD(mode, data) {
-    const l = document.getElementById('hud-left');
-    const c = document.getElementById('hud-center');
-    const r = document.getElementById('hud-right');
-    if (mode === 'qualify') {
-      l.textContent = 'QUALIFY';
-      c.textContent = _fmtTime(data.time);
-      r.textContent = Math.round(data.speed) + ' MPH';
-    } else {
-      l.textContent = 'P' + data.pos + ' LAP ' + data.lap + '/' + data.totalLaps;
-      c.textContent = _fmtTime(data.time);
-      r.textContent = Math.round(data.speed) + ' MPH';
-    }
-    if (Game && typeof Game.getLapProgress === 'function') {
-      const fill = document.getElementById('lap-progress-fill');
-      if (fill) {
-        fill.style.width = (Game.getLapProgress() * 100).toFixed(1) + '%';
-        // Colour the fill live by current speed ratio — at-a-glance pace feedback.
-        // Low speed → red, mid → yellow, high → cyan. Thresholds are intentionally
-        // forgiving so it's green-coded most of the time when driving well.
-        const sr = Math.max(0, Math.min(1, data.speed / 200));
-        const col = sr > 0.70 ? '#0ff' : sr > 0.45 ? '#ff0' : '#f60';
-        fill.style.background = 'linear-gradient(90deg, ' + col + ', #fff)';
+    const h = _hudEls();
+    const leftText = mode === 'qualify'
+      ? 'QUALIFY'
+      : 'P' + data.pos + ' LAP ' + data.lap + '/' + data.totalLaps;
+    _setText(h.l, 'l', leftText);
+    _setText(h.c, 'c', _fmtTime(data.time));
+    _setText(h.r, 'r', Math.round(data.speed) + ' MPH');
+
+    if (h.fill && Game && typeof Game.getLapProgress === 'function') {
+      const pct = (Game.getLapProgress() * 100).toFixed(1) + '%';
+      if (_lastHUD.fillPct !== pct) { _lastHUD.fillPct = pct; h.fill.style.width = pct; }
+      // Colour the fill live by current speed ratio — at-a-glance pace feedback.
+      // Low speed → red, mid → yellow, high → cyan. Thresholds are intentionally
+      // forgiving so it's green-coded most of the time when driving well.
+      const sr = Math.max(0, Math.min(1, data.speed / 200));
+      const col = sr > 0.70 ? '#0ff' : sr > 0.45 ? '#ff0' : '#f60';
+      if (_lastHUD.fillCol !== col) {
+        _lastHUD.fillCol = col;
+        h.fill.style.background = 'linear-gradient(90deg, ' + col + ', #fff)';
       }
     }
 
     // Nitro / combo / draft indicators. All optional — old callers without
     // fx still get a clean HUD.
     const fx = data.fx || {};
-    const nb = document.getElementById('nitro-bar');
-    const nf = document.getElementById('nitro-fill');
-    if (nb && nf) {
-      nf.style.height = ((fx.nitro || 0) * 100).toFixed(0) + '%';
-      nb.classList.toggle('active', !!fx.nitroActive);
-      nb.classList.toggle('full', (fx.nitro || 0) >= 0.999);
+    if (h.nb && h.nf) {
+      const nPct = ((fx.nitro || 0) * 100).toFixed(0) + '%';
+      if (_lastHUD.nitroPct !== nPct) { _lastHUD.nitroPct = nPct; h.nf.style.height = nPct; }
+      const active = !!fx.nitroActive;
+      const full   = (fx.nitro || 0) >= 0.999;
+      if (_lastHUD.nbActive !== active) { _lastHUD.nbActive = active; h.nb.classList.toggle('active', active); }
+      if (_lastHUD.nbFull   !== full)   { _lastHUD.nbFull   = full;   h.nb.classList.toggle('full',   full); }
     }
-    const btn = document.getElementById('btn-nitro');
-    if (btn) {
-      btn.classList.toggle('ready',  (fx.nitro || 0) > 0.08 && !fx.nitroActive);
-      btn.classList.toggle('firing', !!fx.nitroActive);
+    if (h.btn) {
+      const ready  = (fx.nitro || 0) > 0.08 && !fx.nitroActive;
+      const firing = !!fx.nitroActive;
+      if (_lastHUD.btnReady  !== ready)  { _lastHUD.btnReady  = ready;  h.btn.classList.toggle('ready',  ready); }
+      if (_lastHUD.btnFiring !== firing) { _lastHUD.btnFiring = firing; h.btn.classList.toggle('firing', firing); }
     }
-    const cp = document.getElementById('combo-pill');
-    if (cp) {
+    if (h.cp) {
       const show = (fx.combo || 0) >= 2;
-      cp.classList.toggle('visible', show);
-      if (show) cp.textContent = 'COMBO x' + fx.combo;
+      if (_lastHUD.comboShow !== show) { _lastHUD.comboShow = show; h.cp.classList.toggle('visible', show); }
+      if (show) {
+        const txt = 'COMBO x' + fx.combo;
+        if (_lastHUD.comboText !== txt) { _lastHUD.comboText = txt; h.cp.textContent = txt; }
+      }
     }
-    const dp = document.getElementById('draft-pill');
-    if (dp) dp.classList.toggle('visible', !!fx.drafting);
+    if (h.dp) {
+      const show = !!fx.drafting;
+      if (_lastHUD.draftShow !== show) { _lastHUD.draftShow = show; h.dp.classList.toggle('visible', show); }
+    }
   }
 
   function showMsg(msg, duration) {
@@ -577,28 +655,31 @@ const UI = (() => {
       (UnlockManager.isAllComplete && UnlockManager.isAllComplete()) ? 'block' : 'none';
   }
 
-  // ── Cobra prize (populated from CARS config) ──
-  let _cobraCallback = null;
-  function _renderCobraPrize() {
-    const cobra = CARS.find(c => c.id === 'cobra');
-    if (!cobra) return;
-    const nameEl = document.querySelector('.cobra-prize-name');
-    const descEl = document.querySelector('.cobra-prize-desc');
-    const statsEl = document.querySelector('.cobra-prize-stats');
-    if (nameEl) nameEl.textContent = cobra.name.toUpperCase();
-    if (descEl) descEl.textContent = cobra.description;
+  // ── Prize car reveal (populated from the passed car) ──
+  // Any hidden car with prizeUnlock can appear here — the screen template is
+  // shared; fields come from the car object.
+  let _prizeCallback = null;
+  function _renderPrizeUnlock(car) {
+    if (!car) return;
+    const imgEl  = document.getElementById('prize-unlock-img');
+    const nameEl = document.querySelector('.prize-unlock-name');
+    const descEl = document.querySelector('.prize-unlock-desc');
+    const statsEl = document.querySelector('.prize-unlock-stats');
+    if (imgEl && car.prizeImage) imgEl.src = car.prizeImage;
+    if (nameEl) nameEl.textContent = car.name.toUpperCase();
+    if (descEl) descEl.textContent = car.description;
     if (statsEl) {
       statsEl.textContent =
-        'TOP SPEED ▸ ' + cobra.topSpeed + ' MPH\n' +
-        'ACCEL ▸ ' + cobra.acceleration + '\n' +
-        'HANDLING ▸ ' + cobra.handling;
+        'TOP SPEED ▸ ' + car.topSpeed + ' MPH\n' +
+        'ACCEL ▸ ' + car.acceleration + '\n' +
+        'HANDLING ▸ ' + car.handling;
     }
   }
 
-  function showCobraPrize(onRace) {
-    _cobraCallback = onRace;
-    _renderCobraPrize();
-    showScreen('cobraPrize');
+  function showPrizeUnlock(car, onRace) {
+    _prizeCallback = onRace;
+    _renderPrizeUnlock(car);
+    showScreen('prizeUnlock');
   }
 
   // ── Wire-up ────────────────────────────────
@@ -613,14 +694,19 @@ const UI = (() => {
 
     // Reset progress — confirms, wipes localStorage, returns to title.
     document.getElementById('btn-reset-progress').addEventListener('click', () => {
-      if (!confirm('Reset ALL progress?\nUnlocked tiers, completions, leaderboard, and bonus cars will be cleared.')) return;
-      ProgressReset.wipe();
-      selectedCarIndex = 1;
-      selectedTrackIndex = 0;
-      carPage = 0;
-      _cardCache.clear();
-      _refreshTitleTrophy();
-      showMsg('PROGRESS RESET', 1500);
+      confirmDialog(
+        'RESET ALL PROGRESS?',
+        'Unlocked tiers, completions, leaderboard, and bonus cars will be cleared.',
+        () => {
+          ProgressReset.wipe();
+          selectedCarIndex = 1;
+          selectedTrackIndex = 0;
+          carPage = 0;
+          _cardCache.clear();
+          _refreshTitleTrophy();
+          showMsg('PROGRESS RESET', 1500);
+        }
+      );
     });
 
     document.getElementById('btn-page-standard').addEventListener('click', () => _setCarPage(0));
@@ -661,14 +747,14 @@ const UI = (() => {
       if (e.key === 'Enter') { e.preventDefault(); _saveAndAdvance(); return; }
     });
     nameInput.addEventListener('input', () => {
-      if (_pendingResult && _resultsTimer) {
-        clearTimeout(_resultsTimer);
-        _resultsTimer = setTimeout(_saveAndAdvance, 10000);
+      if (_pendingResult) {
+        _startResultsCountdown(GameConstants.RESULTS_AUTOSAVE_MS, _saveAndAdvance);
       }
     });
 
     document.getElementById('btn-continue').addEventListener('click', () => {
       _pendingResult = null;
+      _stopResultsCountdown();
       goToTrackSelect();
     });
 
@@ -778,27 +864,40 @@ const UI = (() => {
           buildCarGrid(); showScreen('carSelect');
         }
       } else if (currentScreen === 'carSelect') {
-        if (e.key === 'ArrowRight') { selectedCarIndex = (selectedCarIndex + 1) % CARS.length; buildCarGrid(); }
-        else if (e.key === 'ArrowLeft') { selectedCarIndex = (selectedCarIndex - 1 + CARS.length) % CARS.length; buildCarGrid(); }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          // Step through only the selectable cards on the current page.
+          const n = _carCards.length;
+          if (n === 0) return;
+          let cur = _carCards.findIndex(entry => entry.index === selectedCarIndex);
+          if (cur < 0) cur = 0;
+          const next = e.key === 'ArrowRight' ? (cur + 1) % n : (cur - 1 + n) % n;
+          _selectCar(_carCards[next].index);
+        }
         else if (e.key === 'Enter') { window._selectedCar = CARS[selectedCarIndex]; buildTrackGrid(); showScreen('trackSelect'); }
       } else if (currentScreen === 'trackSelect') {
-        const len = TRACKS.length;
-        if (e.key === 'ArrowRight') selectedTrackIndex = (selectedTrackIndex + 1) % len;
-        else if (e.key === 'ArrowLeft') selectedTrackIndex = (selectedTrackIndex - 1 + len) % len;
-        else if (e.key === 'ArrowDown') selectedTrackIndex = Math.min(len - 1, selectedTrackIndex + 2);
-        else if (e.key === 'ArrowUp') selectedTrackIndex = Math.max(0, selectedTrackIndex - 2);
-        else if (e.key === 'Enter') { _goRace(); return; }
-        else if (e.key === 'Escape') { buildCarGrid(); showScreen('carSelect'); return; }
-        buildTrackGrid();
+        if (e.key === 'Enter') { _goRace(); return; }
+        if (e.key === 'Escape') { buildCarGrid(); showScreen('carSelect'); return; }
+        // Step through only the unlocked tracks — arrow keys should skip locked cards.
+        const n = _trackCards.length;
+        if (n === 0) return;
+        let cur = _trackCards.findIndex(entry => entry.index === selectedTrackIndex);
+        if (cur < 0) cur = 0;
+        let next = cur;
+        if (e.key === 'ArrowRight') next = (cur + 1) % n;
+        else if (e.key === 'ArrowLeft') next = (cur - 1 + n) % n;
+        else if (e.key === 'ArrowDown') next = Math.min(n - 1, cur + 2);
+        else if (e.key === 'ArrowUp') next = Math.max(0, cur - 2);
+        else return;
+        _selectTrack(_trackCards[next].index);
       } else if (currentScreen === 'results' && e.key === 'Enter') {
         buildTrackGrid(); showScreen('trackSelect');
       }
       if (e.key === 'm' || e.key === 'M') AudioFX.toggle();
     });
 
-    // ── Cobra prize screen ─────────────────────
-    document.getElementById('btn-cobra-race').addEventListener('click', () => {
-      if (_cobraCallback) { const cb = _cobraCallback; _cobraCallback = null; cb(); }
+    // ── Prize-car reveal screen ────────────────
+    document.getElementById('btn-prize-race').addEventListener('click', () => {
+      if (_prizeCallback) { const cb = _prizeCallback; _prizeCallback = null; cb(); }
     });
 
     _refreshTitleTrophy();
@@ -810,6 +909,38 @@ const UI = (() => {
     _wire();
   }
 
-  return { showScreen, showResults, showCobraPrize, updateHUD, showMsg, clearMsg,
-           showPauseOverlay, goToTrackSelect };
+  // In-game confirm dialog — replaces native confirm() so the pixel-art theme
+  // isn't broken by a browser-native prompt on mobile.
+  function confirmDialog(title, body, onOk) {
+    const overlay = document.getElementById('confirm-overlay');
+    const titleEl = document.getElementById('confirm-title');
+    const bodyEl  = document.getElementById('confirm-body');
+    const okBtn   = document.getElementById('btn-confirm-ok');
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+    if (!overlay) { if (onOk) onOk(); return; }
+    titleEl.textContent = title || 'ARE YOU SURE?';
+    bodyEl.textContent = body || '';
+    const close = () => {
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden', 'true');
+      okBtn.removeEventListener('click', okHandler);
+      cancelBtn.removeEventListener('click', cancelHandler);
+      document.removeEventListener('keydown', keyHandler);
+    };
+    const okHandler = () => { close(); if (onOk) onOk(); };
+    const cancelHandler = () => { close(); };
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); cancelHandler(); }
+      else if (e.key === 'Enter') { e.preventDefault(); okHandler(); }
+    };
+    okBtn.addEventListener('click', okHandler);
+    cancelBtn.addEventListener('click', cancelHandler);
+    document.addEventListener('keydown', keyHandler);
+    overlay.classList.add('visible');
+    overlay.setAttribute('aria-hidden', 'false');
+    cancelBtn.focus();
+  }
+
+  return { showScreen, showResults, showPrizeUnlock, updateHUD, showMsg, clearMsg,
+           showPauseOverlay, goToTrackSelect, confirm: confirmDialog };
 })();

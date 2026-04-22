@@ -12,6 +12,33 @@ const AudioFX = (() => {
   let sfxGain = null;
   let musicActive = false;
 
+  // Persisted mute/volume preference. Audio.js loads before tracks.js so we
+  // can't use StorageKeys here — keep the plain key with the same vr_*_v1
+  // versioning pattern the rest of the app uses.
+  const PREFS_KEY = 'vr_audio_v1';
+  function _loadPrefs() {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      if (!raw) return { enabled: false, musicVol: 0.15, sfxVol: 0.7 };
+      const p = JSON.parse(raw);
+      return {
+        enabled:  !!p.enabled,
+        musicVol: typeof p.musicVol === 'number' ? p.musicVol : 0.15,
+        sfxVol:   typeof p.sfxVol   === 'number' ? p.sfxVol   : 0.7,
+      };
+    } catch(e) { return { enabled: false, musicVol: 0.15, sfxVol: 0.7 }; }
+  }
+  function _savePrefs() {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({
+        enabled,
+        musicVol: musicGain ? musicGain.gain.value : 0.15,
+        sfxVol:   sfxGain   ? sfxGain.gain.value   : 0.7,
+      }));
+    } catch(e) {}
+  }
+  let _prefs = _loadPrefs();
+
   // Web Audio lookahead scheduler state
   let nextNoteTime = 0;
   let noteIndex = 0;
@@ -29,10 +56,10 @@ const AudioFX = (() => {
     if (ctx) return;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     musicGain = ctx.createGain();
-    musicGain.gain.value = 0.15;
+    musicGain.gain.value = _prefs.musicVol;
     musicGain.connect(ctx.destination);
     sfxGain = ctx.createGain();
-    sfxGain.gain.value = 0.7;
+    sfxGain.gain.value = _prefs.sfxVol;
     sfxGain.connect(ctx.destination);
     engineGain = ctx.createGain();
     engineGain.gain.value = 0;
@@ -206,6 +233,7 @@ const AudioFX = (() => {
         stopMusic();
         stopEngine();
       }
+      _savePrefs();
       return enabled;
     },
     isEnabled() { return enabled; },
@@ -218,9 +246,33 @@ const AudioFX = (() => {
     playCrash,
     playCheckpoint,
     playCountdown,
+    // Master volume setters — live-update the gain node and persist.
+    setMusicVolume(v) {
+      v = Math.max(0, Math.min(1, v));
+      _init();
+      if (musicGain) musicGain.gain.value = v;
+      _prefs.musicVol = v;
+      _savePrefs();
+    },
+    setSfxVolume(v) {
+      v = Math.max(0, Math.min(1, v));
+      _init();
+      if (sfxGain) sfxGain.gain.value = v;
+      _prefs.sfxVol = v;
+      _savePrefs();
+    },
+    getMusicVolume() { return _prefs.musicVol; },
+    getSfxVolume()   { return _prefs.sfxVol; },
     resume() {
       _init();
       if (ctx && ctx.state === 'suspended') ctx.resume();
+      // Auto-enable audio on first gesture if the user had it on previously.
+      // Browser auto-play policies require a user gesture to start sound,
+      // which is why this can't happen at page load.
+      if (_prefs.enabled && !enabled) {
+        enabled = true;
+        startMusic();
+      }
     }
   };
 })();

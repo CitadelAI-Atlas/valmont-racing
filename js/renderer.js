@@ -4,8 +4,21 @@
 // ─────────────────────────────────────────────
 
 const Renderer = (() => {
-  const DRAW_DISTANCE = 400;
-  const ROAD_WIDTH    = 1200;
+  const DRAW_DISTANCE = GameConstants.DRAW_DISTANCE;
+  const ROAD_WIDTH    = GameConstants.ROAD_WIDTH;
+
+  // Damage vignette cache — radial gradient geometry is stable per (W, H).
+  // Opacity is modulated via globalAlpha at draw time, so one gradient serves
+  // every damage level. Rebuilt only on canvas resize.
+  let _vignetteCache = null;
+  function _damageVignette(ctx, W, H) {
+    if (_vignetteCache && _vignetteCache.w === W && _vignetteCache.h === H) return _vignetteCache.grad;
+    const g = ctx.createRadialGradient(W/2, H*0.85, W*0.15, W/2, H*0.85, W*0.70);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(120,20,0,1)');
+    _vignetteCache = { w: W, h: H, grad: g };
+    return g;
+  }
 
   function buildSegments(track) {
     const segs = [];
@@ -286,7 +299,9 @@ const Renderer = (() => {
     // ── Speed lines (nitro-only) ─────────────
     // Short horizontal streaks from the screen edges inward — reads as motion
     // without the radial-burst arcade filter look. Low count + low alpha.
-    if (fx.nitro) {
+    // Suppressed under prefers-reduced-motion — streaks are exactly the kind
+    // of vestibular trigger the setting exists to avoid.
+    if (fx.nitro && !fx.reducedMotion) {
       const n = 10;
       ctx.strokeStyle = 'rgba(255,255,255,0.22)';
       ctx.lineWidth = 1;
@@ -334,11 +349,14 @@ const Renderer = (() => {
     // damage 0..1. Red edge vignette + rising smoke puffs from the player car.
     const dmg = fx.damage || 0;
     if (dmg > 0.15) {
-      const vg = ctx.createRadialGradient(W/2, H*0.85, W*0.15, W/2, H*0.85, W*0.70);
-      vg.addColorStop(0, 'rgba(0,0,0,0)');
-      vg.addColorStop(1, `rgba(120,20,0,${(dmg * 0.35).toFixed(2)})`);
+      // Gradient geometry only depends on (W, H) — cache per resize, modulate
+      // opacity with globalAlpha so we don't rebuild a CanvasGradient every frame.
+      const vg = _damageVignette(ctx, W, H);
+      const prevAlpha = ctx.globalAlpha;
+      ctx.globalAlpha = prevAlpha * Math.min(1, dmg * 0.35);
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = prevAlpha;
       // Rising smoke puffs — 2-3 soft grey ellipses behind/above the car
       const cx2 = W / 2 + playerX * W * 0.28;
       const cy2 = H * 0.90;
@@ -966,10 +984,12 @@ const Renderer = (() => {
   }
 
   // ── Stars / sun / moon / glow / clouds ────
+  // Data-driven from track fields: night, sunset, moonX, horizonGlow,
+  // cloudStyle, cloudCount, oceanLeft. No track.id branching here.
   function _drawSkyDetails(ctx, track, W, horizon) {
     const id       = track.id;
     const isNight  = !!track.night;
-    const isSunset = id === 'pch';
+    const isSunset = !!track.sunset;
     const rng = _rng(id.charCodeAt(0) * 31 + id.length * 17);
 
     // Stars (night only)
@@ -984,7 +1004,7 @@ const Renderer = (() => {
 
     // Sun / Moon
     if (isNight) {
-      const mx = id === 'dubai' ? W * 0.75 : W * 0.82;
+      const mx = W * (track.moonX || 0.82);
       const my = horizon * 0.28;
       const mr = W * 0.036;
       ctx.fillStyle = '#dde8ff';
@@ -1006,21 +1026,19 @@ const Renderer = (() => {
       ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Horizon glow band
+    // Horizon glow band — track.horizonGlow overrides; sunset gets a warm default.
     const gh = horizon * 0.20;
     const hg = ctx.createLinearGradient(0, horizon - gh, 0, horizon);
     hg.addColorStop(0, 'rgba(0,0,0,0)');
     hg.addColorStop(1,
-      id === 'tokyo'      ? 'rgba(180,20,100,0.22)'    :
-      id === 'dubai'      ? 'rgba(220,130,0,0.24)'     :
-      isSunset            ? 'rgba(255,90,0,0.48)'      :
-      id === 'swiss_alps' ? 'rgba(180,210,255,0.15)'   :
-                            'rgba(255,255,255,0.10)');
+      track.horizonGlow ? track.horizonGlow :
+      isSunset          ? 'rgba(255,90,0,0.48)' :
+                          'rgba(255,255,255,0.10)');
     ctx.fillStyle = hg;
     ctx.fillRect(0, horizon - gh, W, gh);
 
-    // Ocean shimmer (PCH only)
-    if (id === 'pch') {
+    // Ocean shimmer — any coastal track with oceanLeft gets the shimmer band.
+    if (track.oceanLeft) {
       const og = ctx.createLinearGradient(0, horizon - 4, 0, horizon);
       og.addColorStop(0, 'rgba(255,255,255,0)');
       og.addColorStop(1, 'rgba(255,220,180,0.55)');
@@ -1028,26 +1046,29 @@ const Renderer = (() => {
       ctx.fillRect(0, horizon - 4, W * 0.50, 4);
     }
 
-    // Clouds (non-night)
+    // Clouds — skipped at night. cloudCount/cloudStyle from track; sunset tints warm.
     if (!isNight) {
-      const ccFill   = isSunset         ? 'rgba(255,160,80,0.68)' :
-                       id === 'swiss_alps' ? 'rgba(196,212,238,0.60)' :
-                                            'rgba(255,255,255,0.62)';
-      const ccShadow = isSunset         ? 'rgba(175,70,15,0.36)'  :
-                       id === 'swiss_alps' ? 'rgba(135,158,210,0.32)' :
-                                            'rgba(150,155,180,0.32)';
-      const n = (id === 'nullarbor' || id === 'baja') ? 1 :
-                id === 'route66' ? 2 : 4;
+      const cloudStyle = track.cloudStyle || (isSunset ? 'sunset' : 'day');
+      const palette = _CLOUD_PALETTE[cloudStyle] || _CLOUD_PALETTE.day;
+      const n = track.cloudCount;
       for (let i = 0; i < n; i++) {
         const cx = W  * (0.06 + rng() * 0.88);
         const cy = horizon * (0.06 + rng() * 0.44);
         const cw = W  * (0.08 + rng() * 0.13);
         const ch = cw * (0.32 + rng() * 0.28);
-        _cloud(ctx, cx, cy + ch * 0.28, cw, ch * 0.38, ccShadow);
-        _cloud(ctx, cx, cy, cw, ch, ccFill);
+        _cloud(ctx, cx, cy + ch * 0.28, cw, ch * 0.38, palette.shadow);
+        _cloud(ctx, cx, cy, cw, ch, palette.fill);
       }
     }
   }
+
+  // Cloud palettes keyed by track.cloudStyle. Keep here so a new style is
+  // one-entry to add rather than a track.id conditional.
+  const _CLOUD_PALETTE = {
+    day:    { fill: 'rgba(255,255,255,0.62)', shadow: 'rgba(150,155,180,0.32)' },
+    sunset: { fill: 'rgba(255,160,80,0.68)',  shadow: 'rgba(175,70,15,0.36)'   },
+    alps:   { fill: 'rgba(196,212,238,0.60)', shadow: 'rgba(135,158,210,0.32)' },
+  };
 
   function _cloud(ctx, cx, cy, w, h, fill) {
     ctx.fillStyle = fill;
@@ -1065,18 +1086,18 @@ const Renderer = (() => {
     ctx.closePath(); ctx.fill();
   }
 
+  // Data-driven from track.skyline: 'mountains:<style>' | 'city:<style>' | 'trees'
   function _drawHorizonSilhouette(ctx, track, W, horizon) {
-    const id = track.id;
+    const sk = track.skyline;
+    if (!sk) return;
     const night = !!track.night;
-    if      (id === 'swiss_alps') _drawMountains(ctx, 'alps',   W, horizon);
-    else if (id === 'fuji')       _drawMountains(ctx, 'fuji',   W, horizon);
-    else if (id === 'amalfi')     _drawMountains(ctx, 'amalfi', W, horizon);
-    else if (id === 'baja')       _drawMountains(ctx, 'baja',   W, horizon);
-    else if (id === 'tokyo')      _drawCitySkyline(ctx, 'tokyo',  W, horizon, night);
-    else if (id === 'dubai')      _drawCitySkyline(ctx, 'dubai',  W, horizon, night);
-    else if (id === 'la_freeway') _drawCitySkyline(ctx, 'la',     W, horizon, night);
-    else if (id === 'monaco')     _drawCitySkyline(ctx, 'monaco', W, horizon, night);
-    else if (id === 'autobahn')   _drawTreeLine(ctx, W, horizon);
+    if (sk === 'trees') { _drawTreeLine(ctx, W, horizon); return; }
+    const sep = sk.indexOf(':');
+    if (sep < 0) return;
+    const kind  = sk.slice(0, sep);
+    const style = sk.slice(sep + 1);
+    if (kind === 'mountains')   _drawMountains(ctx, style, W, horizon);
+    else if (kind === 'city')   _drawCitySkyline(ctx, style, W, horizon, night);
   }
 
   function _drawMountains(ctx, style, W, horizon) {

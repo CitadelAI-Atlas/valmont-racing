@@ -416,41 +416,41 @@ html, body {
 #zone-left.active  { background: rgba(30, 120, 255, 0.45); color: #6cf; }
 #zone-right.active { background: rgba(160, 40, 240, 0.45); color: #d9b0ff; }
 
-/* ─── COBRA PRIZE ─── */
-#screen-cobra-prize {
+/* ─── PRIZE UNLOCK (shared by any prize-gated car) ─── */
+#screen-prize-unlock {
   background: #000;
   justify-content: center;
   gap: 10px;
   padding: 16px 12px;
 }
-.cobra-prize-header {
+.prize-unlock-header {
   font-size: min(3.5vw, 13px);
   color: #ff0;
   text-shadow: 2px 2px 0 #f80;
   text-align: center;
   animation: blink 0.9s step-end infinite;
 }
-.cobra-prize-img {
+.prize-unlock-img {
   width: 100%;
   max-height: 42vh;
   object-fit: contain;
   border: 2px solid #444;
   flex-shrink: 0;
 }
-.cobra-prize-name {
+.prize-unlock-name {
   font-size: min(4.5vw, 17px);
   color: #0ff;
   text-align: center;
   text-shadow: 2px 2px 0 #006;
 }
-.cobra-prize-desc {
+.prize-unlock-desc {
   font-size: min(2.8vw, 10px);
   color: #ccc;
   text-align: center;
   line-height: 2.4;
   white-space: pre-line;
 }
-.cobra-prize-stats {
+.prize-unlock-stats {
   font-size: min(2.4vw, 9px);
   color: #f80;
   text-align: center;
@@ -573,6 +573,42 @@ html, body {
 .pause-overlay .big-btn   { margin-top: 10px; }
 .pause-overlay .small-btn { margin-top: 10px; }
 
+/* ─── CONFIRM DIALOG (generic, shown via UI.confirm) ─── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.confirm-overlay.visible { display: flex; }
+.confirm-overlay .confirm-box {
+  width: min(84vw, 380px);
+  padding: 20px 16px;
+  background: #000;
+  border: 3px solid #f0f;
+  text-align: center;
+}
+.confirm-overlay .confirm-title {
+  color: #ff0;
+  font-size: min(5vw, 18px);
+  letter-spacing: 3px;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 0 #f80;
+}
+.confirm-overlay .confirm-body {
+  color: #ddd;
+  font-size: min(3.4vw, 13px);
+  line-height: 1.4;
+  margin-bottom: 14px;
+  white-space: pre-wrap;
+}
+.confirm-overlay .confirm-actions { display: flex; flex-direction: column; align-items: center; }
+.confirm-overlay .big-btn   { margin-top: 6px; }
+.confirm-overlay .small-btn { margin-top: 10px; }
+
 /* ─── NITRO / COMBO / DRAFT HUD ───
    Shown only while the game screen is active. Kept narrow/fixed so they don't
    interfere with the touch-zone controls (which cover the bottom half). */
@@ -686,3 +722,17 @@ html, body {
   image-rendering: pixelated;
 }
 #screen-game.active .minimap { display: block; }
+
+/* ─── REDUCED MOTION ───
+   When the user prefers reduced motion (OS-level accessibility setting),
+   suppress decorative CSS animations/transitions. The game loop's visual
+   intensity (screen shake, speed lines, damage vignette) is toggled via
+   the `.reduced-motion` body class set by ui.js. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .blink, .title-trophy { animation: none !important; }
+}

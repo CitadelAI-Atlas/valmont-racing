@@ -19,6 +19,8 @@ const CARS = [
     description: 'Glass cannon. Fastest on tarmac,\ndisasters off-road.',
     crashResistance: 0.35,
     hidden: true,
+    prizeUnlock: true,
+    prizeImage: 'sprites/ferrari458_side.png',
     surfacePenalties: {
       dirt: 0.55, ice: 0.45, oil: 0.40, pothole: 0.35, jump: 'spinout'
     }
@@ -134,6 +136,8 @@ const CARS = [
     description: 'The fastest production car\nfor 20+ years. Open cockpit.\nDoor handles on the inside.\nPure insanity.',
     crashResistance: 0.22,
     hidden: true,                       // won't appear in normal car select
+    prizeUnlock: true,                  // locked until its prize track is qualified
+    prizeImage: 'sprites/Cobra_prize.png',
     surfacePenalties: {
       dirt: 0.60, ice: 0.50, oil: 0.45, pothole: 0.40, jump: 'spinout'
     }

@@ -1,6 +1,21 @@
 // ─────────────────────────────────────────────
 //  TRACKS — 12 tracks, 5 tiers, unlock logic
 // ─────────────────────────────────────────────
+//
+// Renderer-facing fields (picked up by js/renderer.js):
+//   night        — stars + moon + no clouds
+//   sunset       — warm horizon glow + low sun
+//   skyline      — horizon silhouette. One of:
+//                   'mountains:fuji'  'mountains:alps'  'mountains:amalfi'
+//                   'mountains:baja'  'city:tokyo'      'city:dubai'
+//                   'city:la'         'city:monaco'     'trees'
+//   cloudCount   — override default cloud density (default 4, night = 0)
+//   horizonGlow  — override the horizon-band rgba string
+//   oceanLeft    — paint an ocean strip below horizon on the left
+//
+// Gameplay fields driven onto tracks (moved off game.js lookup tables):
+//   scenery      — roadside sprite pool (_spawnScenery picks from this)
+//   trafficPool  — traffic sprite-ID pool (_spawnTraffic picks from this)
 
 const TRACKS = [
   // ── TIER 1: BEGINNER ──────────────────────
@@ -25,13 +40,15 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: null,
-    lapGoal: 2,
-    qualifyTime: 50,
+    cloudCount: 2,
+    scenery: ['billboard', 'cactus', 'barn'],
+    trafficPool: ['Sport01','Comfort01','Highway01','OffRoad01'],
   },
   {
     id: 'pch',
     name: 'Pacific Coast Hwy',
     tier: 1,
+    sunset: true,
     description: 'Ocean cliffs, sunset views. Moderate\ncurves, light traffic.',
     setting: 'Coastal sunset',
     skyColor:   '#ff7040',
@@ -51,8 +68,8 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: null,
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['palm', 'billboard'],
+    trafficPool: ['Sport01','Sport02','Comfort01','OffRoad01'],
   },
 
   // ── TIER 2: INTERMEDIATE ──────────────────
@@ -61,6 +78,8 @@ const TRACKS = [
     name: 'Downtown Tokyo',
     tier: 2,
     night: true,
+    skyline: 'city:tokyo',
+    horizonGlow: 'rgba(180,20,100,0.22)',
     description: 'Night racing through neon-lit streets.\nHeavy traffic, oil slicks.',
     setting: 'City night',
     skyColor:   '#050520',
@@ -81,13 +100,14 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier1',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['building'],
+    trafficPool: ['Sport01','Sport02','Sport03','Comfort01'],
   },
   {
     id: 'la_freeway',
     name: 'LA Freeway',
     tier: 2,
+    skyline: 'city:la',
     description: 'Multi-lane chaos. Weave through\nLA traffic at high speed.',
     setting: 'Urban day',
     skyColor:   '#c0d8f0',
@@ -106,8 +126,8 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier1',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['building', 'billboard'],
+    trafficPool: ['Sport01','Sport02','Comfort01','Highway01'],
   },
 
   // ── TIER 3: ADVANCED ──────────────────────
@@ -115,6 +135,7 @@ const TRACKS = [
     id: 'monaco',
     name: 'Monaco GP',
     tier: 3,
+    skyline: 'city:monaco',
     description: 'Tight hairpins, armco barriers.\nOne mistake ends your race.',
     setting: 'City circuit day',
     skyColor:   '#5599cc',
@@ -136,13 +157,17 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier2',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['building'],
+    trafficPool: ['Sport02','Sport03','Comfort01'],
+    prizeCarId: 'ferrari458',        // qualifying here unlocks the 458 — tight circuit suits the glass cannon
   },
   {
     id: 'swiss_alps',
     name: 'Swiss Alps',
     tier: 3,
+    skyline: 'mountains:alps',
+    horizonGlow: 'rgba(180,210,255,0.15)',
+    cloudStyle: 'alps',
     description: 'Mountain switchbacks, ice patches,\nbreathtaking drops.',
     setting: 'Mountain snow',
     skyColor:   '#d0e8ff',
@@ -171,8 +196,8 @@ const TRACKS = [
       { start: 135, end: 157 },
     ],
     unlockRequires: 'tier2',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['tree', 'boulder'],
+    trafficPool: ['OffRoad01','OffRoad02','Comfort01'],
   },
 
   // ── TIER 4: EXPERT ────────────────────────
@@ -181,6 +206,9 @@ const TRACKS = [
     name: 'Dubai Sheikh Zayed',
     tier: 4,
     night: true,
+    skyline: 'city:dubai',
+    moonX: 0.75,
+    horizonGlow: 'rgba(220,130,0,0.24)',
     description: 'Wide, fast, luxury. Night skyline.\nHigh-speed debris zones.',
     setting: 'City night luxury',
     skyColor:   '#020215',
@@ -199,14 +227,15 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier3',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['building', 'billboard'],
+    trafficPool: ['Sport02','Sport03','Comfort01'],
   },
   {
     id: 'fuji',
     name: 'Fuji Speedway',
     tier: 4,
     weather: 'rain',
+    skyline: 'mountains:fuji',
     description: 'Nod to the original. Fast circuit\nwith a legendary final corner.\nWet conditions.',
     setting: 'Racetrack rain',
     skyColor:   '#6688aa',
@@ -227,8 +256,8 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier3',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['tree', 'billboard'],
+    trafficPool: ['Sport01','Sport02','Sport03'],
   },
 
   // ── TIER 5: MASTER ────────────────────────
@@ -237,6 +266,7 @@ const TRACKS = [
     name: 'Amalfi Coast',
     tier: 5,
     weather: 'fog',
+    skyline: 'mountains:amalfi',
     description: 'Impossibly narrow cliff roads. One\nwrong move = into the sea.\nSea fog.',
     setting: 'Mediterranean cliff',
     skyColor:   '#2266aa',
@@ -263,13 +293,15 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier4',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['building', 'boulder'],
+    trafficPool: ['Sport01','Comfort01','OffRoad01'],
   },
   {
     id: 'baja',
     name: 'Baja California',
     tier: 5,
+    skyline: 'mountains:baja',
+    cloudCount: 1,
     description: 'Desert off-road madness. Dirt, rocks,\njumps. Raptor territory.',
     setting: 'Desert off-road',
     skyColor:   '#d06020',
@@ -296,13 +328,14 @@ const TRACKS = [
     ],
     iceZones: [],
     unlockRequires: 'tier4',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['cactus', 'boulder'],
+    trafficPool: ['OffRoad01','OffRoad02','Highway01'],
   },
   {
     id: 'autobahn',
     name: 'Autobahn',
     tier: 5,
+    skyline: 'trees',
     description: 'No speed limit. Pure top-end\nspeed run. Debris everywhere.',
     setting: 'German highway',
     skyColor:   '#708090',
@@ -322,14 +355,15 @@ const TRACKS = [
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier4',
-    lapGoal: 2,
-    qualifyTime: 50,
-    cobraPrize: true,                // qualifying here unlocks the Shelby Cobra
+    scenery: ['tree', 'billboard'],
+    trafficPool: ['Sport02','Sport03','Highway01','Comfort01'],
+    prizeCarId: 'cobra',             // qualifying here unlocks the Shelby Cobra
   },
   {
     id: 'nullarbor',
     name: 'Nullarbor Plain',
     tier: 5,
+    cloudCount: 1,
     description: 'Dead straight. Endless horizon.\nPure speed test. Australia.',
     setting: 'Outback straight',
     skyColor:   '#c0a060',
@@ -348,15 +382,74 @@ const TRACKS = [
     ],
     iceZones: [],
     unlockRequires: 'tier4',
-    lapGoal: 2,
-    qualifyTime: 50,
+    scenery: ['billboard'],
+    trafficPool: ['OffRoad01','OffRoad02','Highway01','Comfort01'],
   },
 ];
+
+// ── Per-track defaults ────────────────────────
+// Applied once at load so every track has these fields without each definition
+// re-stating them. Override any of these by setting the field on the track above.
+const TRACK_DEFAULTS = Object.freeze({
+  lapGoal:         2,
+  qualifyTime:     50,
+  hazardSpawnRate: 0.015,
+  cloudCount:      4,    // auto-forced to 0 on night tracks in the renderer
+  scenery:        ['billboard'],
+  trafficPool:    ['Sport01','Comfort01','Highway01'],
+});
+for (const t of TRACKS) {
+  for (const k in TRACK_DEFAULTS) {
+    if (t[k] === undefined) t[k] = TRACK_DEFAULTS[k];
+  }
+}
+
+// ── Tier-scaled race rules ────────────────────
+// Starting grid position on the HUD and qualify-time multiplier — both scale
+// with difficulty tier. Beginners get more time + a better grid.
+const TIER_RULES = Object.freeze({
+  1: { gridPos: 2, qualifyMult: 2.0 },
+  2: { gridPos: 4, qualifyMult: 1.5 },
+  3: { gridPos: 6, qualifyMult: 1.2 },
+  4: { gridPos: 8, qualifyMult: 1.2 },
+  5: { gridPos: 8, qualifyMult: 1.2 },
+});
+
+// ── Shared runtime constants ──────────────────
+// Lives in tracks.js (not game.js) because renderer.js needs DRAW_DISTANCE /
+// ROAD_WIDTH and loads before game.js in the script order.
+const GameConstants = Object.freeze({
+  TOTAL_RACERS:       8,      // field size shown in the position HUD (P1..P8)
+  HEAVY_TRAFFIC:      0.60,   // trafficDensity above which a track is "bumper-to-bumper"
+  MINIMAP_RANGE:      30,     // segment radius shown on the mini-map
+  SCENERY_STEP:       40,     // seed scenery every N segments
+  SCENERY_PROB:       0.55,   // per-side spawn probability at each seeded segment
+  TRAFFIC_PER_SEG:    0.025,  // traffic count = segments * density * this
+  HAZARD_DEFAULT:     0.015,  // default per-segment hazard roll when track omits hazardSpawnRate
+  DEFAULT_TIER:       3,      // fall-back tier for TIER_RULES lookup
+  QUALIFY_SPEED_REF:  118,    // cars.topSpeed reference for qualify-time speed scaling
+  DRAW_DISTANCE:      400,    // renderer: number of projected segments
+  ROAD_WIDTH:         1200,   // renderer: virtual road width in world units
+  RESULTS_AUTOSAVE_MS: 10000, // results screen auto-saves score after this delay
+});
+
+// ── Storage key registry ──────────────────────
+// Single source of truth for every localStorage key used by the game.
+// ProgressReset.wipe() iterates this so a new persisted key won't be forgotten.
+const StorageKeys = Object.freeze({
+  unlockedTiers:   'pp_unlocked_tiers',
+  completedTracks: 'pp_completed_tracks',
+  leaderboard:     'vr_lb_v1',
+  prizeUnlocks:    'vr_prize_v1',       // map of { carId: true }
+  tuning:          'vr_tuning_v1',
+  lastCar:         'vr_last_car_v1',    // reserved for future use
+  cobraLegacy:     'vr_cobra_v1',       // legacy: single-flag cobra unlock pre-PrizeUnlock
+});
 
 // ─── Unlock system ────────────────────────────
 const UnlockManager = {
   // Stored in localStorage
-  _key: 'pp_unlocked_tiers',
+  _key: StorageKeys.unlockedTiers,
 
   getUnlocked() {
     try {
@@ -394,7 +487,7 @@ const UnlockManager = {
   },
 
   // Track which tracks have been completed
-  _raceKey: 'pp_completed_tracks',
+  _raceKey: StorageKeys.completedTracks,
 
   markCompleted(trackId) {
     try {
@@ -436,7 +529,7 @@ const UnlockManager = {
 
 // ─── Leaderboard ───────────────────────────────
 const Leaderboard = (() => {
-  const KEY = 'vr_lb_v1';
+  const KEY = StorageKeys.leaderboard;
 
   function _load() {
     try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { return {}; }
@@ -488,20 +581,49 @@ const Leaderboard = (() => {
   return { record, getTrack, getBest, getTotalPoints, resetAll };
 })();
 
-// ─── Cobra unlock ──────────────────────────────
-const CobraUnlock = {
-  _key: 'vr_cobra_v1',
-  isUnlocked() { try { return !!localStorage.getItem(this._key); } catch(e) { return false; } },
-  unlock()     { try { localStorage.setItem(this._key, '1');      } catch(e) {} },
-  reset()      { try { localStorage.removeItem(this._key);         } catch(e) {} },
-};
+// ─── Prize-car unlock ──────────────────────────
+// Map-backed so future hidden prize cars drop in by setting car.prizeUnlock +
+// a track.prizeCarId; no code edit needed. Migrates the legacy single-flag
+// 'vr_cobra_v1' key on first read so existing saves keep their Cobra.
+const PrizeUnlock = (() => {
+  const KEY = StorageKeys.prizeUnlocks;
+  const LEGACY = StorageKeys.cobraLegacy;
+  let _migrated = false;
+
+  function _load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function _save(m) {
+    try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) {}
+  }
+  function _migrate() {
+    if (_migrated) return;
+    _migrated = true;
+    try {
+      if (localStorage.getItem(LEGACY)) {
+        const m = _load();
+        if (!m.cobra) { m.cobra = true; _save(m); }
+        localStorage.removeItem(LEGACY);
+      }
+    } catch (e) {}
+  }
+
+  return {
+    isUnlocked(carId) { _migrate(); return !!_load()[carId]; },
+    unlock(carId)     { _migrate(); const m = _load(); m[carId] = true; _save(m); },
+    reset() {
+      try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY); } catch (e) {}
+    },
+  };
+})();
 
 // ─── Per-car tuning presets (car-select → TUNE button) ──
 // Three presets shift stat points between top speed / accel / handling and
 // adjust dirt penalty. Applied at race start via Tuning.apply(car). Original
 // base stats are untouched — returns a new car-like object.
 const Tuning = (() => {
-  const KEY = 'vr_tuning_v1';
+  const KEY = StorageKeys.tuning;
   const PRESETS = {
     stock: { label: 'STOCK', dTop: 0,   dAcc: 0,  dHand: 0,   dDirt: 1.00 },
     race:  { label: 'RACE',  dTop: 10,  dAcc: 8,  dHand: -15, dDirt: 1.25 },
@@ -559,7 +681,7 @@ const ProgressReset = {
   wipe() {
     UnlockManager.resetAll();
     Leaderboard.resetAll();
-    CobraUnlock.reset();
+    PrizeUnlock.reset();
     Tuning.resetAll();
   }
 };
