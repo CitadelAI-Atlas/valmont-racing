@@ -445,9 +445,9 @@ const Game = (() => {
   };
 
   // Discrete lane centers — traffic sits on one of these unless mid-change.
-  // Road dividers are drawn at ±0.33 (normalized road-width), so real lane
-  // centers are the midpoints of [-1,-0.33], [-0.33,0], [0,+0.33], [+0.33,+1].
-  const LANES = [-0.665, -0.165, 0.165, 0.665];
+  // Road dividers are drawn at ±0.33 (normalized road-width), giving three
+  // lanes: left [-1,-0.33], middle [-0.33,+0.33], right [+0.33,+1].
+  const LANES = [-0.665, 0, 0.665];
 
   function _spawnTraffic(density) {
     trafficCars = [];
@@ -660,11 +660,16 @@ const Game = (() => {
     trafficCars.forEach(tc => {
       if (tc._hitCooldown > 0) { tc._hitCooldown--; return; }
       const tSeg = Math.floor(tc.z) % segments.length;
-      // Only collide when traffic is ahead of player (player running into it).
-      // Skip if traffic is overtaking from behind — avoidance logic handles that.
+      // Only collide when the player is catching traffic from behind. The
+      // segDiff window catches traffic just ahead (segDiff 0..3), but on
+      // lane-locked tracks faster traffic can move forward through the
+      // player's segment without ever being "ahead" — that's a rear-end by
+      // the traffic, not a crash the player caused. Require player to be
+      // the faster car for the collision to register.
       const segDiff = (tSeg - pSeg + segments.length) % segments.length;
       const trafficAhead = segDiff < segments.length / 2;
       if (!trafficAhead || segDiff >= 4) return;
+      if (playerSpeed <= tc.speed) return;
       if (Math.abs(tc.x - playerX) < 0.28) {
         const spdR   = playerMaxSpeed > 0 ? playerSpeed / playerMaxSpeed : 0;
         const resist = car.crashResistance || 1.0;
