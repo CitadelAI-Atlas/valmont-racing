@@ -1,14 +1,15 @@
 // ─────────────────────────────────────────────
-//  TRACKS — 12 tracks, 5 tiers, unlock logic
+//  TRACKS — 9 tracks, 5 tiers (Drye Geography Edition)
 // ─────────────────────────────────────────────
 //
 // Renderer-facing fields (picked up by js/renderer.js):
 //   night        — stars + moon + no clouds
 //   sunset       — warm horizon glow + low sun
 //   skyline      — horizon silhouette. One of:
-//                   'mountains:fuji'  'mountains:alps'  'mountains:amalfi'
-//                   'mountains:baja'  'city:tokyo'      'city:dubai'
-//                   'city:la'         'city:monaco'     'trees'
+//                   'mountains:oahu'  'city:athens'  'city:orlando'
+//                   'city:atlanta'    'city:nyc'     'city:vegas'
+//                   'trees:secaucus'  'trees:garden_city'  'trees:tulum'
+//   weather      — 'rain' | 'fog' | 'golden_hour' | 'partly_cloudy' | 'rush_hour_haze'
 //   cloudCount   — override default cloud density (default 4, night = 0)
 //   horizonGlow  — override the horizon-band rgba string
 //   oceanLeft    — paint an ocean strip below horizon on the left
@@ -16,374 +17,291 @@
 // Gameplay fields driven onto tracks (moved off game.js lookup tables):
 //   scenery      — roadside sprite pool (_spawnScenery picks from this)
 //   trafficPool  — traffic sprite-ID pool (_spawnTraffic picks from this)
+//
+// UI / presentation:
+//   introLabel   — stencil overlay shown ~1.5s before countdown
+//   prizeCarId   — car unlocked when this track is qualified
+//   creditsRoll  — true on the finale track; triggers dedication card
 
 const TRACKS = [
-  // ── TIER 1: BEGINNER ──────────────────────
+  // ── TIER 1: HOME ──────────────────────────
   {
-    id: 'route66',
-    name: 'Route 66',
+    id: 'athens',
+    name: 'Athens GA',
     tier: 1,
-    description: 'Classic American highway. Long straights,\ngentle curves. Perfect starting point.',
-    setting: 'Desert day',
-    skyColor:   '#87ceeb',
-    groundColor:'#c8a060',
+    skyline: 'city:athens',
+    introLabel: 'ATHENS · GA · GAME DAY',
+    description: 'Red and Black everywhere. Fans\nspilling into the street. Dawgs\nat home.',
+    setting: 'College town, game-day clear',
+    skyColor:   '#8fc6ea',
+    groundColor:'#6a8a3a',
     roadColor:  '#555555',
     lineColor:  '#ffff00',
     hazards: ['traffic_light'],
-    trafficDensity: 0.3,
+    trafficDensity: 0.35,
     length: 150,
     curves: [
-      { start: 30,  end: 45,  curve: 0.3 },
-      { start: 90,  end: 105, curve: -0.2 },
+      { start: 30, end: 45, curve: 0.3 },
+      { start: 90, end: 105, curve: -0.25 },
     ],
     hills: [],
     dirtZones: [],
     iceZones: [],
     unlockRequires: null,
-    cloudCount: 2,
-    scenery: ['billboard', 'cactus', 'barn'],
+    cloudCount: 3,
+    scenery: ['stadium_crowd', 'tree', 'billboard'],
     trafficPool: ['Sport01','Comfort01','Highway01','OffRoad01'],
   },
   {
-    id: 'pch',
-    name: 'Pacific Coast Hwy',
+    id: 'secaucus',
+    name: 'Secaucus NJ',
     tier: 1,
-    sunset: true,
-    description: 'Ocean cliffs, sunset views. Moderate\ncurves, light traffic.',
-    setting: 'Coastal sunset',
-    skyColor:   '#ff7040',
-    groundColor:'#8B7355',
-    oceanLeft:   true,
-    roadColor:  '#484848',
+    skyline: 'trees:secaucus',
+    introLabel: 'SECAUCUS · NJ',
+    description: 'Trees both sides, quiet road.\nHometown feel.',
+    setting: 'Suburban New Jersey',
+    skyColor:   '#a8c8e0',
+    groundColor:'#4a6a2a',
+    roadColor:  '#4a4a4a',
     lineColor:  '#ffffff',
-    hazards: ['traffic_light', 'pothole'],
-    trafficDensity: 0.35,
-    length: 165,
+    hazards: ['traffic_light'],
+    trafficDensity: 0.25,
+    length: 160,
     curves: [
-      { start: 15,  end: 37,  curve: 0.5 },
-      { start: 60,  end: 82,  curve: -0.4 },
-      { start: 112, end: 135, curve: 0.6 },
+      { start: 22, end: 40, curve: 0.35 },
+      { start: 70, end: 88, curve: -0.30 },
+      { start: 120, end: 138, curve: 0.25 },
     ],
-    hills: [{ start: 45, end: 67, height: 0.4 }],
+    hills: [{ start: 50, end: 80, height: 0.25 }],
     dirtZones: [],
     iceZones: [],
     unlockRequires: null,
-    scenery: ['palm', 'billboard'],
-    trafficPool: ['Sport01','Sport02','Comfort01','OffRoad01'],
+    cloudCount: 4,
+    scenery: ['tree', 'billboard'],
+    trafficPool: ['Sport01','Comfort01','Highway01'],
   },
 
-  // ── TIER 2: INTERMEDIATE ──────────────────
+  // ── TIER 2: FAMILY TRIPS ──────────────────
   {
-    id: 'tokyo',
-    name: 'Downtown Tokyo',
+    id: 'garden_city',
+    name: 'Garden City Beach',
     tier: 2,
-    night: true,
-    skyline: 'city:tokyo',
-    horizonGlow: 'rgba(180,20,100,0.22)',
-    description: 'Night racing through neon-lit streets.\nHeavy traffic, oil slicks.',
-    setting: 'City night',
-    skyColor:   '#050520',
-    groundColor:'#1a1a2e',
-    roadColor:  '#2a2a2a',
-    lineColor:  '#00ffff',
-    hazards: ['traffic_heavy', 'oil'],
-    trafficDensity: 0.65,
-    length: 180,
+    skyline: 'trees:garden_city',
+    weather: 'partly_cloudy',
+    introLabel: 'GARDEN CITY · SC · BEACH TRIP',
+    description: 'Water on the left, beach houses\non the right. Family-trip chill.',
+    setting: 'Coastal Carolina, sunny',
+    skyColor:   '#a8d8f0',
+    groundColor:'#c8b880',
+    oceanLeft:   true,
+    roadColor:  '#505050',
+    lineColor:  '#ffffff',
+    hazards: ['traffic_light', 'pothole'],
+    trafficDensity: 0.32,
+    length: 165,
     curves: [
-      { start: 7,   end: 22,  curve: 0.7 },
-      { start: 37,  end: 52,  curve: -0.8 },
-      { start: 75,  end: 90,  curve: 0.6 },
-      { start: 120, end: 135, curve: -0.7 },
-      { start: 150, end: 165, curve: 0.5 },
+      { start: 18, end: 40, curve: 0.45 },
+      { start: 62, end: 84, curve: -0.40 },
+      { start: 112, end: 135, curve: 0.50 },
     ],
-    hills: [],
+    hills: [{ start: 45, end: 70, height: 0.30 }],
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier1',
-    scenery: ['building'],
-    trafficPool: ['Sport01','Sport02','Sport03','Comfort01'],
+    scenery: ['beach_house', 'palm', 'billboard'],
+    trafficPool: ['Sport01','Comfort01','OffRoad01','Highway01'],
   },
   {
-    id: 'la_freeway',
-    name: 'LA Freeway',
+    id: 'orlando',
+    name: 'Orlando',
     tier: 2,
-    skyline: 'city:la',
-    description: 'Multi-lane chaos. Weave through\nLA traffic at high speed.',
-    setting: 'Urban day',
-    skyColor:   '#c0d8f0',
-    groundColor:'#808080',
-    roadColor:  '#606060',
+    skyline: 'city:orlando',
+    weather: 'partly_cloudy',
+    introLabel: 'ORLANDO · FL · FAMILY VACATION',
+    description: 'Theme-park gates, monorail overhead,\nballoons in the sky. Family vacation.',
+    setting: 'Florida, warm sun',
+    skyColor:   '#b0d8ee',
+    groundColor:'#6aa040',
+    roadColor:  '#505050',
     lineColor:  '#ffffff',
-    hazards: ['traffic_heavy', 'pothole', 'debris'],
-    trafficDensity: 0.70,
-    length: 150,
+    hazards: ['traffic_medium', 'pothole'],
+    trafficDensity: 0.45,
+    length: 160,
     curves: [
-      { start: 22,  end: 37,  curve: 0.3 },
-      { start: 75,  end: 90,  curve: -0.3 },
-      { start: 120, end: 135, curve: 0.4 },
+      { start: 20, end: 38, curve: 0.40 },
+      { start: 62, end: 80, curve: -0.45 },
+      { start: 105, end: 125, curve: 0.50 },
+      { start: 140, end: 156, curve: -0.35 },
     ],
     hills: [],
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier1',
-    scenery: ['building', 'billboard'],
+    scenery: ['balloon', 'tree', 'billboard'],
+    trafficPool: ['Comfort01','Highway01','OffRoad01','Sport01'],
+  },
+
+  // ── TIER 3: DESTINATIONS ──────────────────
+  {
+    id: 'oahu',
+    name: 'Oahu',
+    tier: 3,
+    skyline: 'mountains:oahu',
+    weather: 'rain',
+    introLabel: 'OAHU · HAWAII',
+    description: 'Green volcanic mountains on the\nright, Pacific on the left. Light rain.',
+    setting: 'Hawaiian coast, tropical',
+    skyColor:   '#7ab0c8',
+    groundColor:'#3a7a40',
+    oceanLeft:   true,
+    roadColor:  '#484848',
+    lineColor:  '#ffffff',
+    hazards: ['pothole', 'debris', 'traffic_light'],
+    trafficDensity: 0.35,
+    length: 180,
+    curves: [
+      { start: 12, end: 32, curve: 0.70 },
+      { start: 50, end: 70, curve: -0.85 },
+      { start: 95, end: 115, curve: 0.90 },
+      { start: 140, end: 160, curve: -0.75 },
+    ],
+    hills: [
+      { start: 0, end: 90, height: 0.35 },
+      { start: 100, end: 170, height: 0.50 },
+    ],
+    dirtZones: [],
+    iceZones: [],
+    unlockRequires: 'tier2',
+    scenery: ['palm', 'boulder'],
+    trafficPool: ['Sport01','Comfort01','OffRoad01','OffRoad02'],
+  },
+  {
+    id: 'tulum',
+    name: 'Tulum',
+    tier: 3,
+    skyline: 'trees:tulum',
+    weather: 'golden_hour',
+    introLabel: 'TULUM · MEXICO · GOLDEN HOUR',
+    description: 'Beachfront huts, palms, the\nCaribbean glowing gold.',
+    setting: 'Yucatán coast, sunset glow',
+    skyColor:   '#f0a060',
+    groundColor:'#b89060',
+    oceanLeft:   true,
+    roadColor:  '#4e4638',
+    lineColor:  '#ffffff',
+    horizonGlow: 'rgba(255,160,60,0.55)',
+    hazards: ['pothole', 'traffic_light'],
+    trafficDensity: 0.28,
+    length: 165,
+    curves: [
+      { start: 18, end: 40, curve: 0.55 },
+      { start: 65, end: 88, curve: -0.45 },
+      { start: 110, end: 135, curve: 0.65 },
+    ],
+    hills: [{ start: 40, end: 70, height: 0.25 }],
+    dirtZones: [],
+    iceZones: [],
+    unlockRequires: 'tier2',
+    scenery: ['tiki_hut', 'palm'],
+    trafficPool: ['Comfort01','OffRoad01','Sport01'],
+  },
+
+  // ── TIER 4: URBAN ─────────────────────────
+  {
+    id: 'atlanta_i285',
+    name: 'Atlanta I-285',
+    tier: 4,
+    skyline: 'city:atlanta',
+    weather: 'rush_hour_haze',
+    introLabel: 'ATLANTA · I-285 · RUSH HOUR',
+    description: 'The Perimeter at rush hour.\nBumper to bumper, semis, overpasses.\nWelcome home to the commute.',
+    setting: 'Interstate rush hour',
+    skyColor:   '#b0a890',
+    groundColor:'#707060',
+    roadColor:  '#3e3e3e',
+    lineColor:  '#ffffff',
+    horizonGlow: 'rgba(180,140,90,0.32)',
+    hazards: ['traffic_heavy', 'debris', 'oil'],
+    trafficDensity: 0.90,            // HERO — bumper-to-bumper weave
+    length: 210,
+    curves: [
+      { start: 22, end: 40, curve: 0.45 },
+      { start: 70, end: 90, curve: -0.40 },
+      { start: 120, end: 140, curve: 0.55 },
+      { start: 170, end: 190, curve: -0.35 },
+    ],
+    hills: [{ start: 50, end: 110, height: 0.20 }],
+    dirtZones: [],
+    iceZones: [],
+    unlockRequires: 'tier3',
+    cloudCount: 5,
+    scenery: ['overpass_sign', 'building', 'billboard'],
+    trafficPool: ['Sport01','Sport02','Comfort01','Highway01','OffRoad01'],
+    prizeCarId: 'ferrari458',        // Italian supercar + American rush hour = hero-track reward
+  },
+  {
+    id: 'nyc',
+    name: 'Manhattan',
+    tier: 4,
+    skyline: 'city:nyc',
+    introLabel: 'NEW YORK · MANHATTAN',
+    description: 'Skyscrapers both sides, yellow\ncabs weaving, steam off the vents.',
+    setting: 'Midtown, overcast',
+    skyColor:   '#9aa0a8',
+    groundColor:'#505560',
+    roadColor:  '#383838',
+    lineColor:  '#ffff00',
+    hazards: ['traffic_heavy', 'pothole', 'debris'],
+    trafficDensity: 0.75,
+    length: 180,
+    curves: [
+      { start: 15, end: 30, curve: 0.50 },
+      { start: 55, end: 72, curve: -0.60 },
+      { start: 98, end: 115, curve: 0.55 },
+      { start: 140, end: 160, curve: -0.50 },
+    ],
+    hills: [],
+    dirtZones: [],
+    iceZones: [],
+    unlockRequires: 'tier3',
+    cloudCount: 6,
+    scenery: ['skyscraper', 'building', 'billboard'],
     trafficPool: ['Sport01','Sport02','Comfort01','Highway01'],
   },
 
-  // ── TIER 3: ADVANCED ──────────────────────
+  // ── TIER 5: ENDGAME ───────────────────────
   {
-    id: 'monaco',
-    name: 'Monaco GP',
-    tier: 3,
-    skyline: 'city:monaco',
-    description: 'Tight hairpins, armco barriers.\nOne mistake ends your race.',
-    setting: 'City circuit day',
-    skyColor:   '#5599cc',
-    groundColor:'#909090',
-    roadColor:  '#3a3a3a',
-    lineColor:  '#ffffff',
-    hazards: ['barrier', 'debris', 'traffic_medium'],
-    trafficDensity: 0.50,
-    length: 135,
-    curves: [
-      { start: 7,   end: 18,  curve: 1.2 },
-      { start: 26,  end: 37,  curve: -1.0 },
-      { start: 52,  end: 63,  curve: 1.5 },
-      { start: 75,  end: 86,  curve: -1.3 },
-      { start: 105, end: 116, curve: 1.1 },
-      { start: 121, end: 131, curve: -0.9 },
-    ],
-    hills: [],
-    dirtZones: [],
-    iceZones: [],
-    unlockRequires: 'tier2',
-    scenery: ['building'],
-    trafficPool: ['Sport02','Sport03','Comfort01'],
-    prizeCarId: 'ferrari458',        // qualifying here unlocks the 458 — tight circuit suits the glass cannon
-  },
-  {
-    id: 'swiss_alps',
-    name: 'Swiss Alps',
-    tier: 3,
-    skyline: 'mountains:alps',
-    horizonGlow: 'rgba(180,210,255,0.15)',
-    cloudStyle: 'alps',
-    description: 'Mountain switchbacks, ice patches,\nbreathtaking drops.',
-    setting: 'Mountain snow',
-    skyColor:   '#d0e8ff',
-    groundColor:'#ffffff',
-    roadColor:  '#555566',
-    lineColor:  '#ffff00',
-    hazards: ['ice', 'pothole', 'debris'],
-    trafficDensity: 0.30,
-    length: 195,
-    curves: [
-      { start: 15,  end: 30,  curve: 0.9 },
-      { start: 41,  end: 56,  curve: -1.1 },
-      { start: 75,  end: 90,  curve: 1.3 },
-      { start: 108, end: 123, curve: -1.2 },
-      { start: 150, end: 165, curve: 1.0 },
-      { start: 176, end: 191, curve: -0.8 },
-    ],
-    hills: [
-      { start: 0,   end: 60,  height: 0.6 },
-      { start: 97,  end: 150, height: 0.8 },
-    ],
-    dirtZones: [],
-    iceZones: [
-      { start: 30,  end: 45  },
-      { start: 75,  end: 90  },
-      { start: 135, end: 157 },
-    ],
-    unlockRequires: 'tier2',
-    scenery: ['tree', 'boulder'],
-    trafficPool: ['OffRoad01','OffRoad02','Comfort01'],
-  },
-
-  // ── TIER 4: EXPERT ────────────────────────
-  {
-    id: 'dubai',
-    name: 'Dubai Sheikh Zayed',
-    tier: 4,
+    id: 'vegas',
+    name: 'Las Vegas Strip',
+    tier: 5,
     night: true,
-    skyline: 'city:dubai',
-    moonX: 0.75,
-    horizonGlow: 'rgba(220,130,0,0.24)',
-    description: 'Wide, fast, luxury. Night skyline.\nHigh-speed debris zones.',
-    setting: 'City night luxury',
-    skyColor:   '#020215',
-    groundColor:'#1a1008',
-    roadColor:  '#1a1a1a',
+    skyline: 'city:vegas',
+    moonX: 0.8,
+    horizonGlow: 'rgba(255,90,180,0.28)',
+    introLabel: 'LAS VEGAS · THE STRIP',
+    description: 'Neon blazing, limos on the Strip,\ndesert beyond. Finale.',
+    setting: 'Vegas Strip at night',
+    skyColor:   '#080822',
+    groundColor:'#221820',
+    roadColor:  '#1e1e1e',
     lineColor:  '#ffd700',
-    hazards: ['traffic_heavy', 'debris', 'oil'],
-    trafficDensity: 0.60,
+    hazards: ['traffic_heavy', 'debris'],
+    trafficDensity: 0.70,
     length: 210,
     curves: [
-      { start: 37,  end: 52,  curve: 0.4 },
-      { start: 97,  end: 112, curve: -0.3 },
-      { start: 157, end: 180, curve: 0.5 },
-    ],
-    hills: [],
-    dirtZones: [],
-    iceZones: [],
-    unlockRequires: 'tier3',
-    scenery: ['building', 'billboard'],
-    trafficPool: ['Sport02','Sport03','Comfort01'],
-  },
-  {
-    id: 'fuji',
-    name: 'Fuji Speedway',
-    tier: 4,
-    weather: 'rain',
-    skyline: 'mountains:fuji',
-    description: 'Nod to the original. Fast circuit\nwith a legendary final corner.\nWet conditions.',
-    setting: 'Racetrack rain',
-    skyColor:   '#6688aa',
-    groundColor:'#4a7a30',
-    roadColor:  '#404040',
-    lineColor:  '#ffffff',
-    hazards: ['traffic_medium', 'debris', 'oil'],
-    trafficDensity: 0.55,
-    length: 190,
-    curves: [
-      { start: 22,  end: 41,  curve: 0.6 },
-      { start: 60,  end: 75,  curve: -0.4 },
-      { start: 105, end: 123, curve: 0.8 },
-      { start: 150, end: 165, curve: -1.0 },
-      { start: 176, end: 186, curve: 1.2 },
-    ],
-    hills: [{ start: 37, end: 75, height: 0.3 }],
-    dirtZones: [],
-    iceZones: [],
-    unlockRequires: 'tier3',
-    scenery: ['tree', 'billboard'],
-    trafficPool: ['Sport01','Sport02','Sport03'],
-  },
-
-  // ── TIER 5: MASTER ────────────────────────
-  {
-    id: 'amalfi',
-    name: 'Amalfi Coast',
-    tier: 5,
-    weather: 'fog',
-    skyline: 'mountains:amalfi',
-    description: 'Impossibly narrow cliff roads. One\nwrong move = into the sea.\nSea fog.',
-    setting: 'Mediterranean cliff',
-    skyColor:   '#2266aa',
-    groundColor:'#4a8040',
-    roadColor:  '#505050',
-    lineColor:  '#ffffff',
-    hazards: ['barrier', 'pothole', 'debris', 'traffic_medium'],
-    trafficDensity: 0.50,
-    length: 150,
-    curves: [
-      { start: 3,   end: 15,  curve: 1.4 },
-      { start: 21,  end: 31,  curve: -1.6 },
-      { start: 41,  end: 52,  curve: 1.5 },
-      { start: 60,  end: 71,  curve: -1.3 },
-      { start: 82,  end: 93,  curve: 1.6 },
-      { start: 105, end: 116, curve: -1.4 },
-      { start: 127, end: 138, curve: 1.2 },
-      { start: 144, end: 150, curve: -1.0 },
-    ],
-    hills: [
-      { start: 0,   end: 75,  height: 0.5 },
-      { start: 75,  end: 150, height: 0.7 },
-    ],
-    dirtZones: [],
-    iceZones: [],
-    unlockRequires: 'tier4',
-    scenery: ['building', 'boulder'],
-    trafficPool: ['Sport01','Comfort01','OffRoad01'],
-  },
-  {
-    id: 'baja',
-    name: 'Baja California',
-    tier: 5,
-    skyline: 'mountains:baja',
-    cloudCount: 1,
-    description: 'Desert off-road madness. Dirt, rocks,\njumps. Raptor territory.',
-    setting: 'Desert off-road',
-    skyColor:   '#d06020',
-    groundColor:'#c87820',
-    roadColor:  '#a06030',
-    lineColor:  '#ffaa00',
-    hazards: ['dirt_heavy', 'pothole', 'jump', 'debris'],
-    trafficDensity: 0.25,
-    length: 225,
-    curves: [
-      { start: 15,  end: 33,  curve: 0.7 },
-      { start: 52,  end: 67,  curve: -0.8 },
-      { start: 90,  end: 108, curve: 0.9 },
-      { start: 135, end: 150, curve: -0.6 },
-      { start: 180, end: 198, curve: 0.7 },
-    ],
-    hills: [
-      { start: 22,  end: 52,  height: 0.5 },
-      { start: 97,  end: 127, height: 0.7 },
-      { start: 165, end: 202, height: 0.6 },
-    ],
-    dirtZones: [
-      { start: 0,   end: 225 }   // entire track is dirt
-    ],
-    iceZones: [],
-    unlockRequires: 'tier4',
-    scenery: ['cactus', 'boulder'],
-    trafficPool: ['OffRoad01','OffRoad02','Highway01'],
-  },
-  {
-    id: 'autobahn',
-    name: 'Autobahn',
-    tier: 5,
-    skyline: 'trees',
-    description: 'No speed limit. Pure top-end\nspeed run. Debris everywhere.',
-    setting: 'German highway',
-    skyColor:   '#708090',
-    groundColor:'#556b2f',
-    roadColor:  '#3a3a3a',
-    lineColor:  '#ffffff',
-    hazards: ['traffic_heavy', 'debris', 'oil'],
-    hazardSpawnRate: 0.006,          // lighter debris — high-speed highway, not a junkyard
-    trafficDensity: 0.75,
-    length: 240,
-    curves: [
-      { start: 45,  end: 60,  curve: 0.2 },
-      { start: 120, end: 135, curve: -0.2 },
-      { start: 195, end: 210, curve: 0.2 },
+      { start: 30, end: 48, curve: 0.30 },
+      { start: 90, end: 108, curve: -0.35 },
+      { start: 150, end: 170, curve: 0.40 },
     ],
     hills: [],
     dirtZones: [],
     iceZones: [],
     unlockRequires: 'tier4',
-    scenery: ['tree', 'billboard'],
-    trafficPool: ['Sport02','Sport03','Highway01','Comfort01'],
-    prizeCarId: 'cobra',             // qualifying here unlocks the Shelby Cobra
-  },
-  {
-    id: 'nullarbor',
-    name: 'Nullarbor Plain',
-    tier: 5,
-    cloudCount: 1,
-    description: 'Dead straight. Endless horizon.\nPure speed test. Australia.',
-    setting: 'Outback straight',
-    skyColor:   '#c0a060',
-    groundColor:'#a07840',
-    roadColor:  '#505040',
-    lineColor:  '#ffffff',
-    hazards: ['pothole', 'debris', 'dirt_patches'],
-    trafficDensity: 0.20,
-    length: 300,
-    curves: [],
-    hills: [],
-    dirtZones: [
-      { start: 60,  end: 75  },
-      { start: 150, end: 180 },
-      { start: 247, end: 277 },
-    ],
-    iceZones: [],
-    unlockRequires: 'tier4',
-    scenery: ['billboard'],
-    trafficPool: ['OffRoad01','OffRoad02','Highway01','Comfort01'],
+    cloudCount: 0,
+    scenery: ['neon_sign', 'building', 'billboard'],
+    trafficPool: ['Sport02','Sport03','Comfort01','Highway01'],
+    prizeCarId: 'cobra',             // qualifying Vegas unlocks the Shelby Cobra 427
+    creditsRoll: true,               // triggers dedication card on race completion
   },
 ];
 
@@ -436,14 +354,20 @@ const GameConstants = Object.freeze({
 // ── Storage key registry ──────────────────────
 // Single source of truth for every localStorage key used by the game.
 // ProgressReset.wipe() iterates this so a new persisted key won't be forgotten.
+//
+// v1.0.0 (Drye Geography Edition) bumped every progress key to _v2. The old
+// 12-track roster was cut entirely; leaving the old keys in place would mean
+// phantom "route66 / monaco / autobahn" entries in the leaderboard forever.
+// Tuning stays on _v1 — cars didn't change, user's RACE/RALLY preferences
+// are still valid and worth preserving across the migration.
 const StorageKeys = Object.freeze({
-  unlockedTiers:   'pp_unlocked_tiers',
-  completedTracks: 'pp_completed_tracks',
-  leaderboard:     'vr_lb_v1',
-  prizeUnlocks:    'vr_prize_v1',       // map of { carId: true }
-  tuning:          'vr_tuning_v1',
-  lastCar:         'vr_last_car_v1',    // reserved for future use
-  cobraLegacy:     'vr_cobra_v1',       // legacy: single-flag cobra unlock pre-PrizeUnlock
+  unlockedTiers:   'pp_unlocked_v2',
+  completedTracks: 'pp_completed_v2',
+  leaderboard:     'vr_lb_v2',
+  prizeUnlocks:    'vr_prize_v2',       // map of { carId: true }
+  tuning:          'vr_tuning_v1',      // preserved across v1.0.0 reset
+  lastCar:         'vr_last_car_v2',
+  vegasCredits:    'vr_credits_v1',     // one-shot: dedication card shown once
 });
 
 // ─── Unlock system ────────────────────────────
@@ -583,12 +507,9 @@ const Leaderboard = (() => {
 
 // ─── Prize-car unlock ──────────────────────────
 // Map-backed so future hidden prize cars drop in by setting car.prizeUnlock +
-// a track.prizeCarId; no code edit needed. Migrates the legacy single-flag
-// 'vr_cobra_v1' key on first read so existing saves keep their Cobra.
+// a track.prizeCarId; no code edit needed.
 const PrizeUnlock = (() => {
   const KEY = StorageKeys.prizeUnlocks;
-  const LEGACY = StorageKeys.cobraLegacy;
-  let _migrated = false;
 
   function _load() {
     try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }
@@ -597,24 +518,23 @@ const PrizeUnlock = (() => {
   function _save(m) {
     try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) {}
   }
-  function _migrate() {
-    if (_migrated) return;
-    _migrated = true;
-    try {
-      if (localStorage.getItem(LEGACY)) {
-        const m = _load();
-        if (!m.cobra) { m.cobra = true; _save(m); }
-        localStorage.removeItem(LEGACY);
-      }
-    } catch (e) {}
-  }
 
   return {
-    isUnlocked(carId) { _migrate(); return !!_load()[carId]; },
-    unlock(carId)     { _migrate(); const m = _load(); m[carId] = true; _save(m); },
-    reset() {
-      try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY); } catch (e) {}
-    },
+    isUnlocked(carId) { return !!_load()[carId]; },
+    unlock(carId)     { const m = _load(); m[carId] = true; _save(m); },
+    reset()           { try { localStorage.removeItem(KEY); } catch (e) {} },
+  };
+})();
+
+// ─── Vegas one-shot: dedication card on first completion ────
+// Separate storage key so RESET PROGRESS restores the moment. Read on every
+// Vegas race finish; written once the dedication has played to end.
+const VegasCredits = (() => {
+  const KEY = StorageKeys.vegasCredits;
+  return {
+    hasShown()   { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } },
+    markShown()  { try { localStorage.setItem(KEY, '1'); } catch (e) {} },
+    reset()      { try { localStorage.removeItem(KEY); } catch (e) {} },
   };
 })();
 
@@ -677,11 +597,14 @@ const Tuning = (() => {
 })();
 
 // ─── Full progress reset (invoked from title screen button) ──
+// Tuning is intentionally excluded here — RESET PROGRESS is a clean career
+// wipe, not a car-tuning wipe. Players treat STOCK/RACE/RALLY as a car setting,
+// not as progress. Tuning.resetAll() stays available for direct use.
 const ProgressReset = {
   wipe() {
     UnlockManager.resetAll();
     Leaderboard.resetAll();
     PrizeUnlock.reset();
-    Tuning.resetAll();
+    VegasCredits.reset();
   }
 };

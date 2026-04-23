@@ -257,16 +257,25 @@ const Renderer = (() => {
       }
     }
 
-    // ── Distance fog ─────────────────────────
-    // Fade far segments toward sky colour so the horizon dissolves smoothly.
-    // Covers roughly the top 35% of the road area (far half of draw distance).
-    // track.weather === 'fog' thickens the band and pushes it further down.
-    const heavyFog = track.weather === 'fog';
+    // ── Distance fog / atmosphere band ──────
+    // Fade far segments toward an atmospheric band so the horizon dissolves
+    // smoothly. track.weather mode picks the flavour:
+    //   'fog'            — thick grey, covers ~80% of road area
+    //   'rush_hour_haze' — warm ochre/brown smog, medium thickness (Atlanta)
+    //   (default)        — thin band tinted toward track.skyColor
+    const wm = track.weather;
+    let fogCol = track.skyColor || '#88a';
+    let fogSpan = 0.45;
+    let fogAlpha = 0.55;
+    if (wm === 'fog') {
+      fogCol = '#cad2d8'; fogSpan = 0.80; fogAlpha = 0.78;
+    } else if (wm === 'rush_hour_haze') {
+      fogCol = '#c0a478'; fogSpan = 0.58; fogAlpha = 0.60;
+    }
     const fogTop = horizon;
-    const fogBot = horizon + roadH * (heavyFog ? 0.80 : 0.45);
+    const fogBot = horizon + roadH * fogSpan;
     const fogG = ctx.createLinearGradient(0, fogTop, 0, fogBot);
-    const fogCol = heavyFog ? '#cad2d8' : (track.skyColor || '#88a');
-    fogG.addColorStop(0, _alpha(fogCol, heavyFog ? 0.78 : 0.55));
+    fogG.addColorStop(0, _alpha(fogCol, fogAlpha));
     fogG.addColorStop(1, _alpha(fogCol, 0));
     ctx.fillStyle = fogG;
     ctx.fillRect(0, fogTop, W, fogBot - fogTop);
@@ -661,6 +670,180 @@ const Renderer = (() => {
       ctx.moveTo( w * 0.14, bodyY + bodyH * 0.39);
       ctx.lineTo(-w * 0.14, h - 1);
       ctx.stroke();
+
+    // ── ATHENS: stadium crowd (Red & Black) ──────────
+    } else if (sprite.type === 'stadium_crowd') {
+      // Bleacher base
+      ctx.fillStyle = '#555';
+      ctx.fillRect(-w / 2, h * 0.70, w, h * 0.30);
+      // Crowd torsos — alternating red/black rectangles, two rows
+      const cols = Math.max(5, Math.floor(w / 4));
+      const bw = w / cols;
+      for (let row = 0; row < 2; row++) {
+        const ry = h * (0.32 + row * 0.22);
+        for (let c = 0; c < cols; c++) {
+          const hash = (c * 7 + row * 3);
+          ctx.fillStyle = (hash % 2 === 0) ? '#b00020' : '#1a1a1a';
+          ctx.fillRect(-w / 2 + c * bw, ry, bw - 1, h * 0.18);
+          // Head dab
+          ctx.fillStyle = '#e8c898';
+          ctx.fillRect(-w / 2 + c * bw + bw * 0.25, ry - h * 0.08, bw * 0.50, h * 0.08);
+        }
+      }
+
+    // ── GARDEN CITY: beach house on stilts ───────────
+    } else if (sprite.type === 'beach_house') {
+      // Stilts
+      ctx.fillStyle = '#8a6a48';
+      ctx.fillRect(-w * 0.38, h * 0.68, w * 0.08, h * 0.32);
+      ctx.fillRect( w * 0.30, h * 0.68, w * 0.08, h * 0.32);
+      // Body (pastel wood)
+      ctx.fillStyle = '#e8d4b0';
+      ctx.fillRect(-w / 2, h * 0.30, w, h * 0.40);
+      // Roof (pitched, weathered blue)
+      ctx.fillStyle = '#6a90b0';
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.58, h * 0.30);
+      ctx.lineTo(0, h * 0.02);
+      ctx.lineTo( w * 0.58, h * 0.30);
+      ctx.closePath(); ctx.fill();
+      // Porch rail
+      ctx.fillStyle = '#6a4820';
+      ctx.fillRect(-w * 0.50, h * 0.66, w, h * 0.04);
+      // Door + window
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(-w * 0.08, h * 0.42, w * 0.18, h * 0.26);
+      ctx.fillStyle = '#88bbee';
+      ctx.fillRect( w * 0.14, h * 0.38, w * 0.20, h * 0.18);
+
+    // ── ATLANTA: overpass gantry sign ────────────────
+    } else if (sprite.type === 'overpass_sign') {
+      // Gantry pole (assume this is the right-side pole of a gantry that spans the road)
+      ctx.fillStyle = '#6a6a6a';
+      ctx.fillRect(-w * 0.04, h * 0.20, w * 0.08, h * 0.80);
+      // Cross arm extending left (over road)
+      ctx.fillStyle = '#4a4a4a';
+      ctx.fillRect(-w * 1.10, h * 0.20, w * 1.10, h * 0.06);
+      // Green sign panel
+      ctx.fillStyle = '#0f5a1a';
+      ctx.fillRect(-w * 0.85, h * 0.05, w * 0.75, h * 0.22);
+      // White text stripes
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-w * 0.80, h * 0.10, w * 0.65, h * 0.04);
+      ctx.fillRect(-w * 0.72, h * 0.17, w * 0.48, h * 0.04);
+      // Shield
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(-w * 0.14, h * 0.08, w * 0.06, h * 0.16);
+      ctx.fillStyle = '#ffd700';
+      ctx.fillRect(-w * 0.13, h * 0.10, w * 0.04, h * 0.10);
+
+    // ── VEGAS: vertical neon casino sign ─────────────
+    } else if (sprite.type === 'neon_sign') {
+      // Pole
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(-w * 0.06, h * 0.20, w * 0.12, h * 0.80);
+      // Sign box stack (3 glowing rectangles, rising)
+      const colors = ['#ff2e88', '#ffcc00', '#00e0ff'];
+      for (let i = 0; i < 3; i++) {
+        const y = h * (0.04 + i * 0.18);
+        const bw = w * (0.85 - i * 0.08);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-bw / 2 - 2, y - 2, bw + 4, h * 0.16 + 4);
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(-bw / 2, y, bw, h * 0.14);
+        // Glow (simulate with lighter inset)
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillRect(-bw / 2 + 2, y + 2, bw - 4, Math.max(1, h * 0.03));
+      }
+
+    // ── ORLANDO: monorail pylon + rail beam ──────────
+    } else if (sprite.type === 'monorail') {
+      // Pylon
+      ctx.fillStyle = '#b8b8c8';
+      ctx.fillRect(-w * 0.08, h * 0.35, w * 0.16, h * 0.65);
+      // Rail beam (horizontal concrete)
+      ctx.fillStyle = '#d0d0d8';
+      ctx.fillRect(-w * 0.55, h * 0.28, w * 1.10, h * 0.09);
+      // Rail car
+      ctx.fillStyle = '#f0f0f4';
+      ctx.fillRect(-w * 0.42, h * 0.14, w * 0.84, h * 0.16);
+      ctx.fillStyle = '#88bbee';
+      ctx.fillRect(-w * 0.36, h * 0.18, w * 0.72, h * 0.06);
+      ctx.fillStyle = '#d8442a';
+      ctx.fillRect(-w * 0.42, h * 0.28, w * 0.84, h * 0.02);
+
+    // ── ORLANDO: balloon cluster ─────────────────────
+    } else if (sprite.type === 'balloon') {
+      // String (from ground hook)
+      ctx.strokeStyle = '#aaaaaa';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      ctx.lineTo(0, h * 0.55);
+      ctx.stroke();
+      // Three balloons, different colors
+      const bc = [['#e02030', -w * 0.22, h * 0.28],
+                  ['#ffcc00',  w * 0.18, h * 0.22],
+                  ['#2a8cff', -w * 0.02, h * 0.10]];
+      for (const [col, bx, by] of bc) {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(bx, by, w * 0.22, h * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Shine
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        ctx.ellipse(bx - w * 0.06, by - h * 0.07, w * 0.05, h * 0.04, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+    // ── TULUM: thatched tiki hut ─────────────────────
+    } else if (sprite.type === 'tiki_hut') {
+      // Body (open sides, dark interior)
+      ctx.fillStyle = '#3a2a18';
+      ctx.fillRect(-w * 0.42, h * 0.48, w * 0.84, h * 0.42);
+      // Support posts
+      ctx.fillStyle = '#6a4a28';
+      ctx.fillRect(-w * 0.44, h * 0.46, w * 0.08, h * 0.54);
+      ctx.fillRect( w * 0.36, h * 0.46, w * 0.08, h * 0.54);
+      // Thatch roof (triangular, multi-tone straw)
+      ctx.fillStyle = '#8a6a2a';
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.60, h * 0.48);
+      ctx.lineTo(0, h * 0.08);
+      ctx.lineTo( w * 0.60, h * 0.48);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6a4a18';
+      // Thatch stripes
+      for (let i = 0; i < 4; i++) {
+        ctx.fillRect(-w * 0.55 + i * w * 0.10, h * (0.42 + i * 0.015),
+                     w * 0.08, Math.max(1, h * 0.02));
+      }
+
+    // ── NYC: tall narrow skyscraper ──────────────────
+    } else if (sprite.type === 'skyscraper') {
+      // Body is a tall thin column — narrower than the generic building sprite
+      ctx.fillStyle = '#2a2a32';
+      const sw = w * 0.70;
+      ctx.fillRect(-sw / 2, 0, sw, h);
+      // Window grid — denser than 'building', gold at the top third
+      const cols = Math.max(3, Math.floor(sw / 6));
+      const rows = Math.max(6, Math.floor(h / 8));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const on = (c * 5 + r * 3) % 4 > 0;
+          if (!on) { continue; }
+          // Crown windows (top quarter) glow warmer
+          ctx.fillStyle = (r < rows * 0.25) ? '#ffe866' : '#88ddff';
+          ctx.fillRect(-sw / 2 + 2 + c * (sw / cols),
+                       2 + r * (h / rows),
+                       Math.max(2, sw / cols - 3),
+                       Math.max(2, h / rows - 3));
+        }
+      }
+      // Spire at top
+      ctx.fillStyle = '#555';
+      ctx.fillRect(-w * 0.04, -h * 0.06, w * 0.08, h * 0.08);
     }
 
     ctx.restore();
@@ -1046,9 +1229,14 @@ const Renderer = (() => {
       ctx.fillRect(0, horizon - 4, W * 0.50, 4);
     }
 
-    // Clouds — skipped at night. cloudCount/cloudStyle from track; sunset tints warm.
+    // Clouds — skipped at night. cloudCount/cloudStyle from track; weather
+    // drives default palette (golden_hour → warm, rush_hour_haze → ochre).
     if (!isNight) {
-      const cloudStyle = track.cloudStyle || (isSunset ? 'sunset' : 'day');
+      let defaultStyle = isSunset ? 'sunset' : 'day';
+      if (track.weather === 'golden_hour')    defaultStyle = 'golden';
+      else if (track.weather === 'rush_hour_haze') defaultStyle = 'haze';
+      else if (track.weather === 'partly_cloudy')  defaultStyle = 'partly';
+      const cloudStyle = track.cloudStyle || defaultStyle;
       const palette = _CLOUD_PALETTE[cloudStyle] || _CLOUD_PALETTE.day;
       const n = track.cloudCount;
       for (let i = 0; i < n; i++) {
@@ -1067,7 +1255,9 @@ const Renderer = (() => {
   const _CLOUD_PALETTE = {
     day:    { fill: 'rgba(255,255,255,0.62)', shadow: 'rgba(150,155,180,0.32)' },
     sunset: { fill: 'rgba(255,160,80,0.68)',  shadow: 'rgba(175,70,15,0.36)'   },
-    alps:   { fill: 'rgba(196,212,238,0.60)', shadow: 'rgba(135,158,210,0.32)' },
+    golden: { fill: 'rgba(255,200,120,0.72)', shadow: 'rgba(200,110,50,0.40)'  },
+    haze:   { fill: 'rgba(210,185,140,0.58)', shadow: 'rgba(150,110,70,0.35)'  },
+    partly: { fill: 'rgba(255,255,255,0.72)', shadow: 'rgba(180,185,200,0.40)' },
   };
 
   function _cloud(ctx, cx, cy, w, h, fill) {
@@ -1086,94 +1276,75 @@ const Renderer = (() => {
     ctx.closePath(); ctx.fill();
   }
 
-  // Data-driven from track.skyline: 'mountains:<style>' | 'city:<style>' | 'trees'
+  // Data-driven from track.skyline: 'mountains:<style>' | 'city:<style>' | 'trees:<style>'
   function _drawHorizonSilhouette(ctx, track, W, horizon) {
     const sk = track.skyline;
     if (!sk) return;
     const night = !!track.night;
-    if (sk === 'trees') { _drawTreeLine(ctx, W, horizon); return; }
     const sep = sk.indexOf(':');
     if (sep < 0) return;
     const kind  = sk.slice(0, sep);
     const style = sk.slice(sep + 1);
     if (kind === 'mountains')   _drawMountains(ctx, style, W, horizon);
     else if (kind === 'city')   _drawCitySkyline(ctx, style, W, horizon, night);
+    else if (kind === 'trees')  _drawTreeLine(ctx, style, W, horizon);
   }
 
+  // Drye-geography mountain styles only. Oahu = volcanic green ridgeline.
   function _drawMountains(ctx, style, W, horizon) {
     const B = horizon;
-    if (style === 'fuji') {
-      ctx.fillStyle = 'rgba(68,78,105,0.35)';
-      _poly(ctx, [[0,B],[W*0.22,B-horizon*0.36],[W*0.44,B]]);
-      _poly(ctx, [[W*0.60,B],[W*0.82,B-horizon*0.40],[W,B]]);
-      ctx.fillStyle = 'rgba(84,92,118,0.58)';
-      _poly(ctx, [[W*0.27,B],[W*0.55,B-horizon*0.68],[W*0.83,B]]);
-      ctx.fillStyle = 'rgba(228,236,255,0.82)';
-      _poly(ctx, [
-        [W*0.43, B-horizon*0.44], [W*0.55, B-horizon*0.68],
-        [W*0.67, B-horizon*0.44], [W*0.61, B-horizon*0.48], [W*0.49, B-horizon*0.48]
-      ]);
-
-    } else if (style === 'alps') {
-      const far  = [[0,.44],[.10,.28],[.22,.42],[.33,.13],[.45,.32],[.55,.08],[.65,.30],[.76,.19],[.88,.36],[1,.44]];
-      const near = [[0,.56],[.08,.36],[.19,.52],[.29,.19],[.41,.41],[.52,.13],[.62,.36],[.73,.24],[.84,.43],[.94,.32],[1,.50]];
-      ctx.fillStyle = 'rgba(152,168,196,0.38)';
+    if (style === 'oahu') {
+      // Tall jagged green ridges — volcanic Hawaiian terrain
+      const far  = [[0,.30],[.08,.42],[.18,.25],[.28,.48],[.40,.34],[.52,.52],[.63,.38],[.74,.50],[.86,.33],[1,.44]];
+      const near = [[0,.12],[.10,.28],[.20,.10],[.32,.34],[.44,.20],[.56,.40],[.68,.24],[.80,.38],[.92,.20],[1,.28]];
+      ctx.fillStyle = 'rgba(40,70,50,0.52)';
       ctx.beginPath(); ctx.moveTo(0, B);
       far.forEach(([x,h]) => ctx.lineTo(W*x, B - horizon*h));
       ctx.lineTo(W, B); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(80,96,126,0.64)';
+      ctx.fillStyle = 'rgba(22,48,28,0.78)';
       ctx.beginPath(); ctx.moveTo(0, B);
       near.forEach(([x,h]) => ctx.lineTo(W*x, B - horizon*h));
       ctx.lineTo(W, B); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(228,238,255,0.82)';
-      [[.29,.19],[.52,.13],[.73,.24]].forEach(([px,ph]) => {
-        _poly(ctx, [
-          [W*(px-.065), B-horizon*(ph+.13)],
-          [W*px,        B-horizon*ph],
-          [W*(px+.065), B-horizon*(ph+.13)],
-        ]);
-      });
-
-    } else if (style === 'amalfi') {
-      const r = [0,.48, .08,.28, .18,.44, .28,.17, .40,.34, .52,.21, .65,.39, .78,.25, .90,.36, 1,.48];
-      ctx.fillStyle = 'rgba(36,55,30,0.55)';
-      ctx.beginPath(); ctx.moveTo(0, B);
-      for (let i = 0; i < r.length; i+=2) ctx.lineTo(W*r[i], B - horizon*r[i+1]);
-      ctx.lineTo(W, B); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(26,44,20,0.72)';
-      ctx.beginPath(); ctx.moveTo(0, B);
-      for (let i = 0; i < r.length; i+=2) ctx.lineTo(W*r[i], B - horizon*(r[i+1]*.55+.24));
-      ctx.lineTo(W, B); ctx.closePath(); ctx.fill();
-
-    } else if (style === 'baja') {
-      ctx.fillStyle = 'rgba(108,65,28,0.42)';
-      _poly(ctx, [[0,B],[W*.14,B-horizon*.36],[W*.30,B-horizon*.30],[W*.40,B]]);
-      _poly(ctx, [[W*.54,B],[W*.63,B-horizon*.32],[W*.80,B-horizon*.28],[W,B]]);
     }
   }
 
-  function _drawCitySkyline(ctx, style, W, horizon, isNight) {
-    const B   = horizon;
-    isNight = !!isNight;
-    const rng = _rng(style.charCodeAt(0) * 31 + style.length * 17);
+  // City silhouette configs — one entry per Drye-geography urban track.
+  const _CITY_CFG = {
+    athens:  { n: 14, minH: .08, maxH: .20, minW: 10, maxW: 22, // low college-town skyline
+               windowCol: 'rgba(255,220,120,0.60)' },
+    atlanta: { n: 20, minH: .24, maxH: .56, minW: 12, maxW: 26, // mid-high dense downtown
+               windowCol: 'rgba(255,228,130,0.52)' },
+    nyc:     { n: 28, minH: .28, maxH: .78, minW: 10, maxW: 22, // tall dense Manhattan
+               windowCol: 'rgba(255,220,140,0.58)' },
+    vegas:   { n: 18, minH: .20, maxH: .52, minW: 14, maxW: 30, // wide casino facades
+               windowCol: 'rgba(255,90,180,0.70)' },
+    orlando: { n: 16, minH: .12, maxH: .28, minW:  8, maxW: 18, // low sprawl behind the castle
+               windowCol: 'rgba(255,220,120,0.55)' },
+  };
 
+  function _drawCitySkyline(ctx, style, W, horizon, isNight) {
+    const B = horizon;
+    const cfg = _CITY_CFG[style] || _CITY_CFG.atlanta;
+
+    // Vegas gets a neon glow band regardless (its whole mood)
     if (isNight) {
       const cg = ctx.createLinearGradient(0, horizon*.60, 0, horizon);
       cg.addColorStop(0, 'rgba(0,0,0,0)');
-      cg.addColorStop(1, style === 'dubai' ? 'rgba(200,120,0,0.22)' : 'rgba(80,0,130,0.22)');
+      cg.addColorStop(1, style === 'vegas' ? 'rgba(220,60,180,0.26)' : 'rgba(80,0,130,0.22)');
       ctx.fillStyle = cg; ctx.fillRect(0, horizon*.60, W, horizon*.40);
     }
 
-    const cfgs = {
-      dubai:  { n:16, minH:.33, maxH:.72, minW:14, maxW:28 },
-      tokyo:  { n:26, minH:.13, maxH:.44, minW:8,  maxW:20 },
-      la:     { n:19, minH:.11, maxH:.38, minW:10, maxW:24 },
-      monaco: { n:22, minH:.09, maxH:.24, minW:7,  maxW:16 },
-    };
-    const cfg  = cfgs[style] || cfgs.la;
+    // Athens gets stadium lights before the skyline draws
+    if (style === 'athens') _drawAthensStadium(ctx, W, horizon);
+
+    // Orlando draws a castle silhouette BEFORE the low skyline, so the skyline
+    // appears behind the castle. Castle is the focal element.
+    if (style === 'orlando') _drawOrlandoCastle(ctx, W, horizon);
+
+    const rng = _rng(style.charCodeAt(0) * 31 + style.length * 17);
     const step = W / cfg.n;
-    const col1 = isNight ? 'rgba(10,6,20,0.94)'  : 'rgba(65,75,100,0.44)';
-    const col2 = isNight ? 'rgba(16,11,32,0.86)'  : 'rgba(50,60,82,0.32)';
+    const col1 = isNight ? 'rgba(10,6,20,0.94)' : 'rgba(65,75,100,0.44)';
+    const col2 = isNight ? 'rgba(16,11,32,0.86)' : 'rgba(50,60,82,0.32)';
 
     // Back row
     ctx.fillStyle = col2;
@@ -1190,7 +1361,7 @@ const Renderer = (() => {
       ctx.fillStyle = col1;
       ctx.fillRect(bx, B - h, w, h);
       if (isNight) {
-        const wc   = style === 'dubai' ? 'rgba(255,208,75,0.75)' : 'rgba(0,188,255,0.65)';
+        const wc   = cfg.windowCol;
         const cols = Math.max(1, w / 5 | 0);
         const rows = Math.max(1, h / 7 | 0);
         for (let row = 0; row < rows; row++) {
@@ -1203,9 +1374,118 @@ const Renderer = (() => {
         }
       }
     }
+
+    // Vegas: add neon sign tips on the tallest buildings
+    if (style === 'vegas') {
+      ctx.fillStyle = 'rgba(255,90,180,0.75)';
+      for (let i = 1; i < cfg.n; i += 3) {
+        const x = i * step + step * 0.4;
+        ctx.fillRect(x, B - horizon * 0.56, 2, horizon * 0.08);
+      }
+      ctx.fillStyle = 'rgba(255,220,60,0.70)';
+      for (let i = 2; i < cfg.n; i += 3) {
+        const x = i * step + step * 0.5;
+        ctx.fillRect(x, B - horizon * 0.62, 2, horizon * 0.10);
+      }
+    }
   }
 
-  function _drawTreeLine(ctx, W, horizon) {
+  // ── Orlando castle silhouette ─────────────────────
+  // Generic fairy-tale castle: four pointed spires over a keep.
+  // DELIBERATELY GENERIC — no specific resemblance to any branded theme
+  // park attraction. Colors kept neutral so it reads as "theme park" not
+  // "this specific theme park." Keep it that way.
+  function _drawOrlandoCastle(ctx, W, horizon) {
+    const cx = W * 0.50;
+    const base = horizon;
+    const baseH = horizon * 0.28;
+    const kw = W * 0.14;
+
+    // Keep body
+    ctx.fillStyle = 'rgba(180,195,220,0.85)';
+    ctx.fillRect(cx - kw / 2, base - baseH, kw, baseH);
+    // Crenellations
+    ctx.fillStyle = 'rgba(130,150,180,0.92)';
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(cx - kw / 2 + i * (kw / 5), base - baseH - 4, kw / 10, 4);
+    }
+    // Four towers (outer-lower, inner-higher) + central tallest
+    const towerXs = [-0.46, -0.22, 0.22, 0.46, 0];
+    const towerHs = [0.35, 0.42, 0.42, 0.35, 0.56];
+    for (let i = 0; i < towerXs.length; i++) {
+      const tx = cx + kw * towerXs[i];
+      const th = horizon * towerHs[i];
+      const tw = W * 0.018;
+      // Shaft
+      ctx.fillStyle = 'rgba(180,195,220,0.90)';
+      ctx.fillRect(tx - tw, base - th, tw * 2, th);
+      // Conical spire
+      ctx.fillStyle = 'rgba(90,120,180,0.95)';
+      ctx.beginPath();
+      ctx.moveTo(tx - tw - 2, base - th);
+      ctx.lineTo(tx, base - th - horizon * 0.14);
+      ctx.lineTo(tx + tw + 2, base - th);
+      ctx.closePath(); ctx.fill();
+      // Pennant
+      ctx.fillStyle = 'rgba(220,80,80,0.95)';
+      ctx.fillRect(tx + 1, base - th - horizon * 0.14, W * 0.010, Math.max(2, horizon * 0.02));
+    }
+    // Gate
+    ctx.fillStyle = 'rgba(60,40,20,0.9)';
+    ctx.fillRect(cx - kw * 0.10, base - baseH * 0.55, kw * 0.20, baseH * 0.55);
+  }
+
+  // ── Athens stadium pylons (game-day lights) ───────
+  // Four floodlight stacks visible over the horizon, centered.
+  function _drawAthensStadium(ctx, W, horizon) {
+    const cx = W * 0.50;
+    const B = horizon;
+    // Stadium bowl shape (low curved silhouette)
+    ctx.fillStyle = 'rgba(60,50,40,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(cx, B + horizon * 0.02, W * 0.34, horizon * 0.12, 0, Math.PI, 0, false);
+    ctx.fill();
+    // Pylon poles + light boxes
+    const pylons = [-0.28, -0.10, 0.10, 0.28];
+    for (const px of pylons) {
+      const x = cx + W * px;
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(x - 1, B - horizon * 0.22, 2, horizon * 0.20);
+      // Light box
+      ctx.fillStyle = '#f0f0d0';
+      ctx.fillRect(x - 6, B - horizon * 0.24, 12, 5);
+      // Glow
+      ctx.fillStyle = 'rgba(255,240,180,0.35)';
+      ctx.fillRect(x - 10, B - horizon * 0.26, 20, 9);
+    }
+  }
+
+  // Tree-line horizon — used by Secaucus (plain), Garden City (palms), Tulum (palms + golden glow).
+  function _drawTreeLine(ctx, style, W, horizon) {
+    style = style || 'secaucus';
+    if (style === 'garden_city' || style === 'tulum') {
+      // Palm silhouettes
+      ctx.fillStyle = style === 'tulum' ? 'rgba(20,14,10,0.70)' : 'rgba(30,60,40,0.58)';
+      const count = Math.max(6, Math.floor(W / 80));
+      for (let i = 0; i < count; i++) {
+        const px = (i + 0.5) * (W / count);
+        const ph = horizon * (0.12 + (i % 3) * 0.04);
+        // Trunk
+        ctx.fillRect(px - 1, horizon - ph, 2, ph);
+        // Fronds — five diagonals
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 2;
+        const fh = horizon * 0.08;
+        for (let k = -2; k <= 2; k++) {
+          ctx.beginPath();
+          ctx.moveTo(px, horizon - ph);
+          ctx.lineTo(px + k * 10, horizon - ph - fh + Math.abs(k) * 4);
+          ctx.stroke();
+        }
+      }
+      return;
+    }
+    // Default: dense forest tree line (Secaucus)
     ctx.fillStyle = 'rgba(16,36,12,0.58)';
     const n = Math.ceil(W / (W * .065));
     for (let i = 0; i < n; i++) {

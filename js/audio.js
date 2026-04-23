@@ -72,21 +72,38 @@ const AudioFX = (() => {
   }
 
   // ── Engine sound (oscillator that pitches with speed) ──
-  function startEngine() {
+  // Per-car engine profiles shape the sawtooth's base freq, rev range, wave
+  // type, and gain envelope. Ferrari high-rev ≠ F150 low rumble ≠ Cobra V8.
+  // Values are tuned by ear, not by real-world spec sheets.
+  const ENGINE_PROFILES = {
+    ferrari458: { base: 130, range: 440, type: 'sawtooth', gBase: 0.04, gScale: 0.08 },
+    cobra:      { base: 70,  range: 300, type: 'square',   gBase: 0.06, gScale: 0.09 },
+    raptor:     { base: 55,  range: 210, type: 'triangle', gBase: 0.07, gScale: 0.10 },
+    sl550:      { base: 85,  range: 250, type: 'sawtooth', gBase: 0.04, gScale: 0.06 },
+    cls550:     { base: 95,  range: 285, type: 'sawtooth', gBase: 0.04, gScale: 0.06 },
+    gx460:      { base: 72,  range: 235, type: 'triangle', gBase: 0.05, gScale: 0.07 },
+    gx470:      { base: 68,  range: 225, type: 'triangle', gBase: 0.05, gScale: 0.07 },
+    _default:   { base: 80,  range: 320, type: 'sawtooth', gBase: 0.04, gScale: 0.07 },
+  };
+  let _activeProfile = ENGINE_PROFILES._default;
+
+  function startEngine(carId) {
     if (!ctx || !enabled) return;
     if (engineNode) return;
+    _activeProfile = (carId && ENGINE_PROFILES[carId]) || ENGINE_PROFILES._default;
     engineNode = ctx.createOscillator();
-    engineNode.type = 'sawtooth';
-    engineNode.frequency.value = 80;
+    engineNode.type = _activeProfile.type;
+    engineNode.frequency.value = _activeProfile.base;
     engineNode.connect(engineGain);
     engineNode.start();
-    engineGain.gain.value = 0.08;
+    engineGain.gain.value = _activeProfile.gBase + 0.02;
   }
 
   function setEngineSpeed(speedRatio) {
     if (!engineNode || !engineGain) return;
-    engineNode.frequency.setTargetAtTime(80 + speedRatio * 320, ctx.currentTime, 0.1);
-    engineGain.gain.setTargetAtTime(0.04 + speedRatio * 0.07, ctx.currentTime, 0.05);
+    const p = _activeProfile;
+    engineNode.frequency.setTargetAtTime(p.base + speedRatio * p.range, ctx.currentTime, 0.1);
+    engineGain.gain.setTargetAtTime(p.gBase + speedRatio * p.gScale, ctx.currentTime, 0.05);
   }
 
   function stopEngine() {

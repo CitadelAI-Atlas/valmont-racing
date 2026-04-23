@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <title>VALMONT RACING</title>
-  <link rel="stylesheet" href="style.css?v=83" />
+  <link rel="stylesheet" href="style.css?v=100" />
 </head>
 <body>
 
@@ -97,6 +97,15 @@
     <button id="btn-pause" class="pause-btn" aria-label="Pause game">❚❚</button>
     <canvas id="game-canvas" aria-label="Race view"></canvas>
     <div id="game-msg" class="game-msg" role="status" aria-live="polite"></div>
+    <div id="intro-card" class="intro-card" aria-hidden="true"></div>
+    <div id="credits-overlay" class="credits-overlay" aria-hidden="true">
+      <div class="credits-inner">
+        <div class="credits-headline">★ GAME COMPLETE ★</div>
+        <div class="credits-dedication">For my Family,<br/>my Friends,<br/>and the Open Road.</div>
+        <div class="credits-footer">VALMONT RACING · 2026</div>
+        <button class="small-btn" id="btn-credits-continue" aria-label="Continue">CONTINUE ▶</button>
+      </div>
+    </div>
     <div id="pause-overlay" class="pause-overlay" role="dialog" aria-label="Paused" aria-hidden="true">
       <div class="pause-box">
         <div class="pause-title">PAUSED</div>
@@ -164,13 +173,13 @@
       };
     }
   </script>
-  <script src="js/audio.js?v=83"></script>
-  <script src="js/sprites.js?v=83"></script>
-  <script src="js/cars.js?v=83"></script>
-  <script src="js/tracks.js?v=83"></script>
-  <script src="js/renderer.js?v=83"></script>
-  <script src="js/ui.js?v=83"></script>
-  <script src="js/game.js?v=83"></script>
+  <script src="js/audio.js?v=100"></script>
+  <script src="js/sprites.js?v=100"></script>
+  <script src="js/cars.js?v=100"></script>
+  <script src="js/tracks.js?v=100"></script>
+  <script src="js/renderer.js?v=100"></script>
+  <script src="js/ui.js?v=100"></script>
+  <script src="js/game.js?v=100"></script>
   <script>
     // Confirm the start button wired up (critical — the game can't begin otherwise).
     var btn = document.getElementById('btn-start');

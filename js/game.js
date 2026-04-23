@@ -102,7 +102,11 @@ const Game = (() => {
     UI.showScreen('game');
     _sizeCanvas();
     UI.clearMsg();
-    _countdown('qualify');
+    if (track.introLabel) {
+      UI.showIntroCard(track.introLabel, 1500, () => _countdown('qualify'));
+    } else {
+      _countdown('qualify');
+    }
   }
 
   function startRace(overrideCar) {
@@ -128,9 +132,16 @@ const Game = (() => {
     _spawnTraffic(track.trafficDensity);
     _sizeCanvas();
     UI.clearMsg();
-    _countdown('race');
-    AudioFX.startMusic();
-    AudioFX.startEngine();
+    const _startRaceNow = () => {
+      _countdown('race');
+      AudioFX.startMusic();
+      AudioFX.startEngine(car && car.id);
+    };
+    if (track.introLabel) {
+      UI.showIntroCard(track.introLabel, 1500, _startRaceNow);
+    } else {
+      _startRaceNow();
+    }
   }
 
   // ── Countdown ──────────────────────────────
@@ -758,14 +769,23 @@ const Game = (() => {
     const afterUnlocks = UnlockManager.getUnlocked();
     const newUnlock = afterUnlocks.find(t => !beforeUnlocks.includes(t)) || null;
 
-    UI.showResults({
+    const resultsPayload = {
       finished: true,
       trackId: track.id,
       trackName: track.name,
       carName: car.name + ' (' + car.color + ')',
       time: raceTime, position, totalCars: GameConstants.TOTAL_RACERS,
       laps: lap - 1, totalLaps, newUnlock,
-    });
+    };
+
+    // Vegas one-shot: first Vegas completion plays the dedication card before
+    // the results screen. Subsequent completions skip straight to results.
+    if (track.creditsRoll && typeof VegasCredits !== 'undefined' && !VegasCredits.hasShown()) {
+      VegasCredits.markShown();
+      UI.showCreditsRoll(() => UI.showResults(resultsPayload));
+    } else {
+      UI.showResults(resultsPayload);
+    }
   }
 
   // ── Keys ───────────────────────────────────
@@ -815,7 +835,7 @@ const Game = (() => {
       pausedFromMode = null;
       UI.showPauseOverlay(false);
       UI.clearMsg();
-      AudioFX.startEngine();
+      AudioFX.startEngine(car && car.id);
     }
   }
 

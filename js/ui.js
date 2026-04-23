@@ -640,6 +640,52 @@ const UI = (() => {
 
   function clearMsg() { document.getElementById('game-msg').textContent = ''; }
 
+  // ── Track intro card ──────────────────────
+  // Shows `label` (from track.introLabel) for `duration` ms, then fires `done`.
+  // Renders above the game canvas as a full-screen dimmed overlay so the name
+  // lands before the countdown hits. Multi-line labels use " · " → newline so
+  // "ATLANTA · I-285 · RUSH HOUR" stacks.
+  let _introTimer = null;
+  function showIntroCard(label, duration, done) {
+    const el = document.getElementById('intro-card');
+    if (!el || !label) { if (done) done(); return; }
+    if (_introTimer) { clearTimeout(_introTimer); _introTimer = null; }
+    el.textContent = label.replace(/\s+·\s+/g, '\n');
+    el.classList.add('visible');
+    el.setAttribute('aria-hidden', 'false');
+    _introTimer = setTimeout(() => {
+      el.classList.remove('visible');
+      el.setAttribute('aria-hidden', 'true');
+      _introTimer = null;
+      if (done) done();
+    }, duration || 1500);
+  }
+
+  // ── Credits + dedication overlay (Vegas one-shot) ──
+  // Shown once when the player completes the Vegas race for the first time.
+  // Dismisses on the continue button OR after a 9s auto-advance. Either path
+  // fires `done()` once. The dedication text lives in index.html so copy lands
+  // in the DOM without JS, and is translation-ready if we ever localize.
+  let _creditsDone = null;
+  function showCreditsRoll(done) {
+    const el = document.getElementById('credits-overlay');
+    const btn = document.getElementById('btn-credits-continue');
+    if (!el) { if (done) done(); return; }
+    _creditsDone = done || null;
+    el.classList.add('visible');
+    el.setAttribute('aria-hidden', 'false');
+    const finish = () => {
+      el.classList.remove('visible');
+      el.setAttribute('aria-hidden', 'true');
+      if (btn) btn.removeEventListener('click', finish);
+      if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
+      const cb = _creditsDone; _creditsDone = null;
+      if (cb) cb();
+    };
+    let _autoTimer = setTimeout(finish, 9000);
+    if (btn) btn.addEventListener('click', finish);
+  }
+
   // ── Pause overlay ─────────────────────────
   function showPauseOverlay(on) {
     const ov = document.getElementById('pause-overlay');
@@ -942,5 +988,6 @@ const UI = (() => {
   }
 
   return { showScreen, showResults, showPrizeUnlock, updateHUD, showMsg, clearMsg,
-           showPauseOverlay, goToTrackSelect, confirm: confirmDialog };
+           showPauseOverlay, showIntroCard, showCreditsRoll,
+           goToTrackSelect, confirm: confirmDialog };
 })();
