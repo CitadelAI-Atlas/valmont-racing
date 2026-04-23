@@ -230,14 +230,22 @@ const Renderer = (() => {
         let sx, sh, sw;
 
         if (sprite.type === 'car') {
-          // Sub-segment interpolation: blend between this segment and the next
-          // farther one using zFrac — eliminates segment-boundary Y snapping.
-          if (sprite.zFrac !== undefined && i < proj.length - 1) {
-            const far = proj[i + 1];
-            const f   = sprite.zFrac;
-            sY  = cur.screenY + (far.screenY - cur.screenY) * f;
-            sRW = cur.roadW   + (far.roadW   - cur.roadW)   * f;
-            sMX = cur.midX    + (far.midX    - cur.midX)    * f;
+          // Sub-segment interpolation: blend between this segment's proj entry
+          // and the NEXT segment's proj entry using zFrac (car's fractional
+          // position in its own segment). Using proj[i+1] is wrong at close
+          // range where step < 1 maps many consecutive proj entries to the
+          // same segment — interpolation only covered a sliver of the segment,
+          // so sprites snapped when tc.z crossed an integer boundary.
+          if (sprite.zFrac !== undefined) {
+            const nextSeg = segments[(cur.seg.index + 1) % totalSegs];
+            const nextI   = segClosest.get(nextSeg);
+            if (nextI !== undefined) {
+              const far = proj[nextI];
+              const f   = sprite.zFrac;
+              sY  = cur.screenY + (far.screenY - cur.screenY) * f;
+              sRW = cur.roadW   + (far.roadW   - cur.roadW)   * f;
+              sMX = cur.midX    + (far.midX    - cur.midX)    * f;
+            }
           }
           // Tighter lane multiplier keeps cars on the road; clamp to road edges
           const laneOffset = sprite.lane * sRW * 0.62;
