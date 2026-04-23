@@ -7,7 +7,7 @@ A retro pseudo-3D arcade racer built as a single-page HTML5 app. Nine tracks, se
 
 ## Play
 
-→ **[valmont-racing on GitHub Pages](https://valmont-racing.github.io)** *(deploys on push to `main`)*
+→ Hosted on Vercel (deploys on push to `main`).
 
 Keyboard: arrow keys drive, `M` toggles music, `ESC`/`P` pauses, `N` for NOS.
 Mobile: tap-hold the steering zones, NOS button bottom-right.

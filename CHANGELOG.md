@@ -20,7 +20,7 @@
 - **Cobra 427 prize gate** locked to **Vegas Strip**
 - New scenery sprites: stadium crowd, beach house, overpass sign, neon sign, monorail, balloon, tiki hut, skyscraper
 - New skyline silhouettes: Athens stadium, Atlanta, NYC, Vegas neon, Orlando castle, Oahu volcanic ridges
-- GitHub Pages deploy workflow — `actions/deploy-pages@v4` on push to main
+- Hosted on Vercel (auto-deploys on push to main)
 
 ### Changed
 - One-time save migration on v1.0.0 boot: progress/leaderboard/prize-unlock keys bumped to `_v2`. Tuning preset preserved at `_v1`. Old completion data is cleared (clean break, no partial migration).
