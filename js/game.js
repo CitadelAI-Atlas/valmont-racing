@@ -445,7 +445,9 @@ const Game = (() => {
   };
 
   // Discrete lane centers — traffic sits on one of these unless mid-change.
-  const LANES = [-0.65, -0.32, 0.32, 0.65];
+  // Road dividers are drawn at ±0.33 (normalized road-width), so real lane
+  // centers are the midpoints of [-1,-0.33], [-0.33,0], [0,+0.33], [+0.33,+1].
+  const LANES = [-0.665, -0.165, 0.165, 0.665];
 
   function _spawnTraffic(density) {
     trafficCars = [];

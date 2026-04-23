@@ -250,9 +250,11 @@ const Renderer = (() => {
             sRW = p0.roadW   + (p1.roadW   - p0.roadW)   * f;
             sMX = p0.midX    + (p1.midX    - p0.midX)    * f;
           }
-          // Tighter lane multiplier keeps cars on the road; clamp to road edges
-          const laneOffset = sprite.lane * sRW * 0.62;
-          sx = sMX + Math.max(-sRW * 0.80, Math.min(sRW * 0.80, laneOffset));
+          // sprite.lane is in normalized road-width units (±1 = road edge),
+          // same convention as playerX. Clamp to ±0.85 so cars don't clip
+          // the rumble strips if something ever pushes them past the edge.
+          const laneOffset = sprite.lane * sRW;
+          sx = sMX + Math.max(-sRW * 0.85, Math.min(sRW * 0.85, laneOffset));
           // Relaxed clamp — at close range 0.22W reads too small next to the
           // player HUD. 0.35W lets a traffic car fill roughly a lane-width at
           // proximity, matching the player car's visual footprint.
