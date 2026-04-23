@@ -226,7 +226,7 @@ const Game = (() => {
     const nitroBoost = nitroActive ? 1.18 : 1.0;
     const draftBoost = drafting    ? 1.06 : 1.0;
     const maxSpd = playerMaxSpeed * nitroBoost * (1 - surfPen);
-    const accel  = 0.7 * (car.acceleration / 100) * (nitroActive ? 2.0 : 1.0) * draftBoost;
+    const accel  = 0.35 * (car.acceleration / 100) * (nitroActive ? 2.0 : 1.0) * draftBoost;
     if (gas && !brake) {
       playerSpeed = Math.min(maxSpd, playerSpeed + accel * dt);
     } else if (brake) {
