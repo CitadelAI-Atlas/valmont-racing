@@ -222,7 +222,8 @@ const TRACKS = [
     lineColor:  '#ffffff',
     horizonGlow: 'rgba(180,140,90,0.32)',
     hazards: ['traffic_heavy', 'debris', 'oil'],
-    trafficDensity: 0.90,            // HERO — bumper-to-bumper weave
+    trafficDensity: 18.0,            // HERO — true rush-hour gridlock (~20x normal)
+    trafficSpeedCap: 0.40,           // 40 mph cap — everyone stuck at commute pace
     length: 210,
     curves: [
       { start: 22, end: 40, curve: 0.45 },

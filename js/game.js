@@ -451,9 +451,15 @@ const Game = (() => {
     trafficCars = [];
     const count = Math.floor(segments.length * density * GameConstants.TRAFFIC_PER_SEG);
     const pool  = track.trafficPool.map(id => ({ spriteId: id }));
+    // Per-track speed cap (e.g. Atlanta rush hour @ 40 mph). When set, the
+    // range becomes [cap*0.5, cap] so we still get stop-and-go variance.
+    const cap = track.trafficSpeedCap;
     for (let i = 0; i < count; i++) {
       const carDef = pool[i % pool.length];
-      const spd    = TRAFFIC_SPEEDS[carDef.spriteId] || { min: 0.55, max: 0.85 };
+      const spdBase = TRAFFIC_SPEEDS[carDef.spriteId] || { min: 0.55, max: 0.85 };
+      const spd = cap != null
+        ? { min: Math.min(spdBase.min, cap * 0.5), max: Math.min(spdBase.max, cap) }
+        : spdBase;
       const baseSpeed = spd.min + Math.random() * (spd.max - spd.min);
       const lane = Math.floor(Math.random() * LANES.length);
       trafficCars.push({
