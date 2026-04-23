@@ -444,6 +444,9 @@ const Game = (() => {
     Sport03:   { min: 1.05, max: 1.20 },   // sport     105–120 mph
   };
 
+  // Discrete lane centers — traffic sits on one of these unless mid-change.
+  const LANES = [-0.65, -0.32, 0.32, 0.65];
+
   function _spawnTraffic(density) {
     trafficCars = [];
     const count = Math.floor(segments.length * density * GameConstants.TRAFFIC_PER_SEG);
@@ -452,17 +455,62 @@ const Game = (() => {
       const carDef = pool[i % pool.length];
       const spd    = TRAFFIC_SPEEDS[carDef.spriteId] || { min: 0.55, max: 0.85 };
       const baseSpeed = spd.min + Math.random() * (spd.max - spd.min);
+      const lane = Math.floor(Math.random() * LANES.length);
       trafficCars.push({
         _id:   i,
         z:     Math.floor(Math.random() * segments.length),
-        x:     [-0.65, -0.32, 0.32, 0.65][Math.floor(Math.random() * 4)],
+        lane,                     // discrete lane index 0..3
+        x:     LANES[lane],       // lateral position — interpolates toward LANES[lane]
         speed: baseSpeed,
         _baseSpeed: baseSpeed,   // rubber-band adjusts around this
         _wasAhead: true,          // pass-detection: transition ahead→behind = pass
+        _laneCooldown: 0,         // seconds until next lane-change attempt allowed
         car:   carDef,
         _hitCooldown: 0,
       });
     }
+  }
+
+  // Returns the nearest traffic car ahead of `tc` in a given lane, or null.
+  // `maxDist` in segment units. Skips self and cars past the wrap threshold.
+  function _nearestInLane(tc, lane, maxDist, L) {
+    let nearest = null;
+    let nearestD = maxDist;
+    for (let i = 0; i < trafficCars.length; i++) {
+      const other = trafficCars[i];
+      if (other === tc || other.lane !== lane) continue;
+      const d = (other.z - tc.z + L) % L;
+      if (d > 0 && d < nearestD) { nearestD = d; nearest = other; }
+    }
+    return nearest ? { other: nearest, dist: nearestD } : null;
+  }
+
+  // Pick a free adjacent lane (or Infinity-gap one further out). Returns the
+  // lane index to switch to, or tc.lane if nothing's clear.
+  function _pickLaneChange(tc, L) {
+    const options = [];
+    if (tc.lane > 0)                options.push(tc.lane - 1);
+    if (tc.lane < LANES.length - 1) options.push(tc.lane + 1);
+    // Prefer the lane with the most space ahead and safe gap behind.
+    let best = tc.lane, bestScore = -Infinity;
+    for (const cand of options) {
+      const ahead = _nearestInLane(tc, cand, 30, L);
+      const behind = _nearestBehindInLane(tc, cand, 6, L);
+      if (behind) continue;                      // someone right behind — unsafe cut
+      const score = ahead ? ahead.dist : 30;
+      if (score > bestScore && score > 8) { bestScore = score; best = cand; }
+    }
+    return best;
+  }
+
+  function _nearestBehindInLane(tc, lane, maxDist, L) {
+    for (let i = 0; i < trafficCars.length; i++) {
+      const other = trafficCars[i];
+      if (other === tc || other.lane !== lane) continue;
+      const d = (tc.z - other.z + L) % L;
+      if (d > 0 && d < maxDist) return { other, dist: d };
+    }
+    return null;
   }
 
   function _updateTraffic(dt) {
@@ -487,40 +535,67 @@ const Game = (() => {
       // clamps at ±8% of baseline.
       const dForward = (tc.z - playerZ + L) % L;
       const ahead = dForward > 0 && dForward < L / 2;
-      if (ahead) {
-        const lead = dForward / (L / 2);  // 0..1 (0 = right on top, 1 = half lap ahead)
-        tc.speed = tc._baseSpeed * (1 - 0.08 * lead);
-      } else {
-        const trail = ((L - dForward) % L) / (L / 2);
-        tc.speed = tc._baseSpeed * (1 + 0.08 * trail);
+      const baseSpeed = ahead
+        ? tc._baseSpeed * (1 - 0.08 * (dForward / (L / 2)))
+        : tc._baseSpeed * (1 + 0.08 * (((L - dForward) % L) / (L / 2)));
+      tc.speed = baseSpeed;
+
+      // ── Same-lane blocking ──
+      // If there's a slower car in our lane within 8 segs, either switch lanes
+      // (if there's a clear one) or slow to match. This is what prevents
+      // traffic from driving through traffic.
+      if (tc._laneCooldown > 0) tc._laneCooldown -= dt;
+      const frontSame = _nearestInLane(tc, tc.lane, 8, L);
+      if (frontSame && frontSame.other.speed < tc.speed - 0.01) {
+        if (tc._laneCooldown <= 0) {
+          const newLane = _pickLaneChange(tc, L);
+          if (newLane !== tc.lane) {
+            tc.lane = newLane;
+            tc._laneCooldown = 1.5;  // debounce so cars don't flicker lanes
+          }
+        }
+        // Even after attempting a change, match the front car's speed if we
+        // haven't cleared out yet — prevents overrun while tc.x interpolates.
+        if (frontSame.dist < 3) {
+          tc.speed = Math.min(tc.speed, frontSame.other.speed);
+        }
       }
+
+      // ── Player avoidance ──
+      // If the player is in our lane just ahead and we're faster, pick an
+      // open adjacent lane. Discrete lane target — interpolation handles
+      // the smooth motion.
+      const tSeg = Math.floor(tc.z) % L;
+      const pSeg = Math.floor(playerZ) % L;
+      const behindP = ((pSeg - tSeg + L) % L) < 12;
+      if (behindP && tc.speed > playerSpeed + 0.05 && Math.abs(LANES[tc.lane] - playerX) < 0.25) {
+        if (tc._laneCooldown <= 0) {
+          const newLane = _pickLaneChange(tc, L);
+          if (newLane !== tc.lane) {
+            tc.lane = newLane;
+            tc._laneCooldown = 1.5;
+          }
+        }
+      }
+
+      // Smoothly interpolate tc.x toward current lane center (4*dt per second).
+      const targetX = LANES[tc.lane];
+      tc.x += (targetX - tc.x) * Math.min(1, 4 * dt);
 
       tc.z += tc.speed * 90 * dt;
       if (tc.z >= L) tc.z -= L;
 
       // ── Pass detection: traffic crosses from ahead-of-player to behind.
-      // Using `isAhead` state against stored `_wasAhead` avoids counting a
-      // pass multiple times when the car hovers near the boundary.
       const dNow = (tc.z - playerZ + L) % L;
       const isAhead = dNow > 0 && dNow < L / 2;
       if (tc._wasAhead && !isAhead) {
         combo++;
         comboTimer = 3.5;
-        // Nitro refill: base +0.12, compounded by combo multiplier up to x4.
         const mult = Math.min(4, 1 + combo * 0.25);
         nitro = Math.min(1, nitro + 0.12 * mult);
         if (combo >= 2) UI.showMsg('PASS x' + combo, 700);
       }
       tc._wasAhead = isAhead;
-
-      // Overtake avoidance — faster traffic closing from behind steers around.
-      const tSeg = Math.floor(tc.z) % L;
-      const pSeg = Math.floor(playerZ) % L;
-      const behindP = ((pSeg - tSeg + L) % L) < 25;
-      if (behindP && tc.speed > playerSpeed + 0.05 && Math.abs(tc.x - playerX) < 0.45) {
-        const target = playerX >= 0 ? -0.65 : 0.65;
-        tc.x += (target - tc.x) * Math.min(1, 3 * dt);
-      }
 
       // Track nearest traffic car directly ahead of the player for draft check.
       if (isAhead && dNow < nearestAhead && Math.abs(tc.x - playerX) < 0.35) {
@@ -528,8 +603,7 @@ const Game = (() => {
         nearestAheadDx = Math.abs(tc.x - playerX);
       }
 
-      const seg = segments[tSeg];
-      const dist = dNow;
+      const seg = segments[Math.floor(tc.z) % L];
       if (seg) {
         seg.trafficSprites.push({ type: 'car', car: tc.car, lane: tc.x, nDist: dNow });
         _dirtyTrafficSegs.push(seg);
