@@ -509,6 +509,8 @@ const Renderer = (() => {
       ctx.strokeRect(fx, 0, fw, fh);
 
     } else if (sprite.type === 'car') {
+      // Scenery convention: y is top of the sprite box, y+h is ground level.
+      // Draw with sprite bottom at y+h so tires sit on the road.
       const trd = sprite.car && sprite.car.spriteId
                     ? Sprites.getTraffic(sprite.car.spriteId) : null;
       if (trd) {
@@ -517,9 +519,9 @@ const Renderer = (() => {
         const dh = dw * (crop.h / crop.w);   // preserve sprite aspect ratio
         ctx.imageSmoothingEnabled = true;
         if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, -dw/2, -dh/2, dw, dh);
+        ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, -dw/2, h - dh, dw, dh);
       } else {
-        drawCarTopDown(ctx, sprite.car, 0, 0, w, h);
+        drawCarTopDown(ctx, sprite.car, 0, h / 2, w, h);
       }
     } else if (sprite.type === 'oil') {
       ctx.fillStyle = 'rgba(20,20,40,0.7)';
