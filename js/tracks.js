@@ -224,6 +224,7 @@ const TRACKS = [
     hazards: ['traffic_heavy', 'debris', 'oil'],
     trafficDensity: 18.0,            // HERO — true rush-hour gridlock (~20x normal)
     trafficSpeedCap: 0.40,           // 40 mph cap — everyone stuck at commute pace
+    trafficLockLanes: true,          // no weaving — only the player changes lanes
     length: 210,
     curves: [
       { start: 22, end: 40, curve: 0.45 },

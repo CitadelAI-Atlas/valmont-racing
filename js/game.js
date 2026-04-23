@@ -532,6 +532,9 @@ const Game = (() => {
     const L = segments.length;
     let nearestAhead = Infinity;
     let nearestAheadDx = 0;
+    // Some tracks lock traffic into constant lanes (e.g. Atlanta gridlock).
+    // When set, only the player can change lanes — traffic just queues up.
+    const lockLanes = !!track.trafficLockLanes;
 
     trafficCars.forEach(tc => {
       // ── Rubber-band AI: nudge traffic speed based on distance to player.
@@ -553,15 +556,15 @@ const Game = (() => {
       if (tc._laneCooldown > 0) tc._laneCooldown -= dt;
       const frontSame = _nearestInLane(tc, tc.lane, 8, L);
       if (frontSame && frontSame.other.speed < tc.speed - 0.01) {
-        if (tc._laneCooldown <= 0) {
+        if (!lockLanes && tc._laneCooldown <= 0) {
           const newLane = _pickLaneChange(tc, L);
           if (newLane !== tc.lane) {
             tc.lane = newLane;
             tc._laneCooldown = 1.5;  // debounce so cars don't flicker lanes
           }
         }
-        // Even after attempting a change, match the front car's speed if we
-        // haven't cleared out yet — prevents overrun while tc.x interpolates.
+        // Speed-match the front car so we don't overrun it. This runs even
+        // when lanes are locked — it's how traffic queues up behind slow cars.
         if (frontSame.dist < 3) {
           tc.speed = Math.min(tc.speed, frontSame.other.speed);
         }
@@ -569,17 +572,19 @@ const Game = (() => {
 
       // ── Player avoidance ──
       // If the player is in our lane just ahead and we're faster, pick an
-      // open adjacent lane. Discrete lane target — interpolation handles
-      // the smooth motion.
-      const tSeg = Math.floor(tc.z) % L;
-      const pSeg = Math.floor(playerZ) % L;
-      const behindP = ((pSeg - tSeg + L) % L) < 12;
-      if (behindP && tc.speed > playerSpeed + 0.05 && Math.abs(LANES[tc.lane] - playerX) < 0.25) {
-        if (tc._laneCooldown <= 0) {
-          const newLane = _pickLaneChange(tc, L);
-          if (newLane !== tc.lane) {
-            tc.lane = newLane;
-            tc._laneCooldown = 1.5;
+      // open adjacent lane. Skipped when lanes are locked — the player must
+      // do the dodging.
+      if (!lockLanes) {
+        const tSeg = Math.floor(tc.z) % L;
+        const pSeg = Math.floor(playerZ) % L;
+        const behindP = ((pSeg - tSeg + L) % L) < 12;
+        if (behindP && tc.speed > playerSpeed + 0.05 && Math.abs(LANES[tc.lane] - playerX) < 0.25) {
+          if (tc._laneCooldown <= 0) {
+            const newLane = _pickLaneChange(tc, L);
+            if (newLane !== tc.lane) {
+              tc.lane = newLane;
+              tc._laneCooldown = 1.5;
+            }
           }
         }
       }
