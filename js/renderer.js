@@ -230,27 +230,33 @@ const Renderer = (() => {
         let sx, sh, sw;
 
         if (sprite.type === 'car') {
-          // Sub-segment interpolation: blend between this segment's proj entry
-          // and the NEXT segment's proj entry using zFrac (car's fractional
-          // position in its own segment). Using proj[i+1] is wrong at close
-          // range where step < 1 maps many consecutive proj entries to the
-          // same segment — interpolation only covered a sliver of the segment,
-          // so sprites snapped when tc.z crossed an integer boundary.
-          if (sprite.zFrac !== undefined) {
-            const nextSeg = segments[(cur.seg.index + 1) % totalSegs];
-            const nextI   = segClosest.get(nextSeg);
-            if (nextI !== undefined) {
-              const far = proj[nextI];
-              const f   = sprite.zFrac;
-              sY  = cur.screenY + (far.screenY - cur.screenY) * f;
-              sRW = cur.roadW   + (far.roadW   - cur.roadW)   * f;
-              sMX = cur.midX    + (far.midX    - cur.midX)    * f;
-            }
+          // Smooth projection: interpolate between the two proj entries that
+          // bracket the sprite's true n (distance in segment-space from camera).
+          // proj is sorted by n, so a linear scan from the current i is O(step).
+          // Using segment-boundary interpolation would be jerky at close range
+          // because proj step=0.15 means a segment spans ~7 proj entries, and
+          // linear blend between segClosest(seg) and segClosest(seg+1) drifts
+          // significantly from the true 1/n curve.
+          if (sprite.nDist !== undefined) {
+            const n = sprite.nDist;
+            let lo = i;
+            while (lo > 0 && proj[lo].n > n) lo--;
+            while (lo < proj.length - 1 && proj[lo + 1].n <= n) lo++;
+            const p0 = proj[lo];
+            const p1 = proj[Math.min(lo + 1, proj.length - 1)];
+            const span = p1.n - p0.n;
+            const f = span > 0 ? (n - p0.n) / span : 0;
+            sY  = p0.screenY + (p1.screenY - p0.screenY) * f;
+            sRW = p0.roadW   + (p1.roadW   - p0.roadW)   * f;
+            sMX = p0.midX    + (p1.midX    - p0.midX)    * f;
           }
           // Tighter lane multiplier keeps cars on the road; clamp to road edges
           const laneOffset = sprite.lane * sRW * 0.62;
           sx = sMX + Math.max(-sRW * 0.80, Math.min(sRW * 0.80, laneOffset));
-          sw = Math.min(sRW * 0.38, W * 0.22);
+          // Relaxed clamp — at close range 0.22W reads too small next to the
+          // player HUD. 0.35W lets a traffic car fill roughly a lane-width at
+          // proximity, matching the player car's visual footprint.
+          sw = Math.min(sRW * 0.48, W * 0.35);
           sh = sw * 1.20;
         } else {
           // Scenery / hazards — original formula, no clamp

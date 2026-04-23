@@ -531,7 +531,7 @@ const Game = (() => {
       const seg = segments[tSeg];
       const dist = dNow;
       if (seg) {
-        seg.trafficSprites.push({ type: 'car', car: tc.car, lane: tc.x, zFrac: tc.z - Math.floor(tc.z) });
+        seg.trafficSprites.push({ type: 'car', car: tc.car, lane: tc.x, nDist: dNow });
         _dirtyTrafficSegs.push(seg);
       }
     });
