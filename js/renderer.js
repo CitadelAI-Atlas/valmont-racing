@@ -225,7 +225,6 @@ const Renderer = (() => {
       const _staLen = _sta.length, _total = _staLen + _tra.length;
       for (let _k = 0; _k < _total; _k++) {
         const sprite = _k < _staLen ? _sta[_k] : _tra[_k - _staLen];
-        if (sprite.type === 'car' && cur.n < 1.1) continue;
 
         let sY = cur.screenY, sRW = cur.roadW, sMX = cur.midX;
         let sx, sh, sw;
