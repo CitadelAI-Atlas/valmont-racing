@@ -608,3 +608,20 @@ const ProgressReset = {
     VegasCredits.reset();
   }
 };
+
+// Dev shortcut: `?unlock=all` unlocks every tier + both prize cars, then
+// strips the query so a normal reload doesn't re-trigger.
+(function devUnlock() {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('unlock') === 'all') {
+      localStorage.setItem(StorageKeys.unlockedTiers, JSON.stringify([1,2,3,4,5]));
+      const prizes = {};
+      TRACKS.forEach(t => { if (t.prizeCarId) prizes[t.prizeCarId] = true; });
+      localStorage.setItem(StorageKeys.prizeUnlocks, JSON.stringify(prizes));
+      q.delete('unlock');
+      const clean = location.pathname + (q.toString() ? '?' + q.toString() : '') + location.hash;
+      history.replaceState(null, '', clean);
+    }
+  } catch (e) {}
+})();
