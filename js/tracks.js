@@ -489,12 +489,16 @@ const Leaderboard = (() => {
   }
 
   // Simple points: P1=10, P2=7, P3=5, P4=3, P5=1
+  const _PTS = [10, 7, 5, 3, 1];
+  function pointsFor(pos) {
+    const i = (pos | 0) - 1;
+    return _PTS[i] || 0;
+  }
   function getTotalPoints() {
-    const PTS = [10, 7, 5, 3, 1];
     let pts = 0;
     const data = _load();
     Object.values(data).forEach(entries => {
-      entries.forEach(e => { pts += (PTS[e.pos - 1] || 0); });
+      entries.forEach(e => { pts += pointsFor(e.pos); });
     });
     return pts;
   }
@@ -503,7 +507,7 @@ const Leaderboard = (() => {
     try { localStorage.removeItem(KEY); } catch(e) {}
   }
 
-  return { record, getTrack, getBest, getTotalPoints, resetAll };
+  return { record, getTrack, getBest, getTotalPoints, pointsFor, resetAll };
 })();
 
 // ─── Prize-car unlock ──────────────────────────

@@ -18,6 +18,10 @@ const Game = (() => {
 
   let lap = 0, totalLaps = 3, raceTime = 0, finished = false, position = 1;
   let hazardEffect = null, crashTimer = 0;
+  // Bullet-time multiplier: drops toward 0.40 when a hazard is in reaction
+  // range (8–28 segs ahead), back to 1.0 otherwise. At 100+ mph the player
+  // would otherwise see a tire for <1 frame.
+  let bulletTime = 1.0;
   let trafficCars = [];
   let countdown = -1, countdownTimer = null;
   let canvas = null, ctx = null, animFrame = null;
@@ -173,14 +177,35 @@ const Game = (() => {
   // ── Main loop ──────────────────────────────
   let lastTs = 0;
   function _loop(ts, mode) {
-    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.033) : 0.016;
+    const realDt = lastTs ? Math.min((ts - lastTs) / 1000, 0.033) : 0.016;
     lastTs = ts;
+
+    _updateBulletTime(realDt, mode);
+    const dt = realDt * bulletTime;
 
     if (state === mode || countdown > 0) {
       _update(dt, mode);
       _draw();
     }
     animFrame = requestAnimationFrame(t => _loop(t, mode));
+  }
+
+  // Ramp bulletTime toward 0.40 when any hazard sits 8–28 segs ahead; back
+  // to 1.0 otherwise. Real-time dt so ramping isn't itself slowed by slow-mo.
+  function _updateBulletTime(realDt, mode) {
+    let target = 1.0;
+    if (mode === 'race' && segments.length && playerSpeed > 0.50) {
+      const L = segments.length;
+      const pSeg = Math.floor(playerZ);
+      for (let i = 8; i < 28 && target === 1.0; i++) {
+        const seg = segments[(pSeg + i) % L];
+        if (!seg || !seg.staticSprites.length) continue;
+        for (let k = 0; k < seg.staticSprites.length; k++) {
+          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.40; break; }
+        }
+      }
+    }
+    bulletTime += (target - bulletTime) * Math.min(1, 8 * realDt);
   }
 
   function _update(dt, mode) {
@@ -855,12 +880,14 @@ const Game = (() => {
     const afterUnlocks = UnlockManager.getUnlocked();
     const newUnlock = afterUnlocks.find(t => !beforeUnlocks.includes(t)) || null;
 
+    const finalPos = Math.max(1, Math.min(GameConstants.TOTAL_RACERS, Math.round(position)));
     const resultsPayload = {
       finished: true,
       trackId: track.id,
       trackName: track.name,
       carName: car.name + ' (' + car.color + ')',
-      time: raceTime, position, totalCars: GameConstants.TOTAL_RACERS,
+      time: raceTime, position: finalPos, totalCars: GameConstants.TOTAL_RACERS,
+      pointsEarned: Leaderboard.pointsFor(finalPos),
       laps: lap - 1, totalLaps, newUnlock,
     };
 

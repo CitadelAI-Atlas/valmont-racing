@@ -467,6 +467,9 @@ const UI = (() => {
     _line('TIME:  ', _fmtTime(data.time));
     _line('POS:   ', data.position + '/' + data.totalCars);
     _line('LAPS:  ', data.laps + '/' + data.totalLaps);
+    if (data.pointsEarned != null) {
+      _line('PTS:   ', (data.pointsEarned > 0 ? '+' : '') + data.pointsEarned);
+    }
 
     if (data.newUnlock) {
       body.appendChild(document.createElement('br'));
