@@ -190,18 +190,19 @@ const Game = (() => {
     animFrame = requestAnimationFrame(t => _loop(t, mode));
   }
 
-  // Ramp bulletTime toward 0.40 when any hazard sits 8–28 segs ahead; back
+  // Ramp bulletTime toward 0.30 when any hazard sits 5–70 segs ahead; back
   // to 1.0 otherwise. Real-time dt so ramping isn't itself slowed by slow-mo.
+  // At 100 mph (90 segs/sec) that's ~0.72s real = ~2.4s effective reaction.
   function _updateBulletTime(realDt, mode) {
     let target = 1.0;
-    if (mode === 'race' && segments.length && playerSpeed > 0.50) {
+    if (mode === 'race' && segments.length && playerSpeed > 0.35) {
       const L = segments.length;
       const pSeg = Math.floor(playerZ);
-      for (let i = 8; i < 28 && target === 1.0; i++) {
+      for (let i = 5; i < 70 && target === 1.0; i++) {
         const seg = segments[(pSeg + i) % L];
         if (!seg || !seg.staticSprites.length) continue;
         for (let k = 0; k < seg.staticSprites.length; k++) {
-          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.40; break; }
+          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.30; break; }
         }
       }
     }
@@ -595,18 +596,25 @@ const Game = (() => {
 
       // ── Player avoidance ──
       // If the player is in our lane just ahead and we're faster, pick an
-      // open adjacent lane. Discrete lane target — interpolation handles
-      // the smooth motion.
+      // open adjacent lane. If no lane is open, speed-match the player —
+      // never drive through them.
       const tSeg = Math.floor(tc.z) % L;
       const pSeg = Math.floor(playerZ) % L;
       const behindP = ((pSeg - tSeg + L) % L) < 12;
       if (behindP && tc.speed > playerSpeed + 0.05 && Math.abs(LANES[tc.lane] - playerX) < 0.25) {
+        let changed = false;
         if (tc._laneCooldown <= 0) {
           const newLane = _pickLaneChange(tc, L);
           if (newLane !== tc.lane) {
             tc.lane = newLane;
             tc._laneCooldown = 1.5;
+            changed = true;
           }
+        }
+        if (!changed) {
+          // Blocked by the player with nowhere to go — queue up at their pace,
+          // all the way to a full stop if the player is stopped.
+          tc.speed = Math.min(tc.speed, Math.max(0, playerSpeed));
         }
       }
 
