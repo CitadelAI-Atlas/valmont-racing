@@ -221,7 +221,8 @@ const TRACKS = [
     roadColor:  '#3e3e3e',
     lineColor:  '#ffffff',
     horizonGlow: 'rgba(180,140,90,0.32)',
-    hazards: ['traffic_heavy', 'debris', 'oil'],
+    hazards: ['debris', 'oil', 'pothole'],
+    hazardSpawnRate: 0.07,           // hero-track rate — ~14 hazards across 210 segs
     trafficDensity: 18.0,            // HERO — true rush-hour gridlock (~20x normal)
     trafficSpeedCap: 0.40,           // 40 mph cap — everyone stuck at commute pace
     length: 210,

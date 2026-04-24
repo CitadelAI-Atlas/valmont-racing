@@ -569,11 +569,12 @@ const UI = (() => {
     _hud.btn     = document.getElementById('btn-nitro');
     _hud.cp      = document.getElementById('combo-pill');
     _hud.dp      = document.getElementById('draft-pill');
+    _hud.sp      = document.getElementById('slowmo-pill');
     return _hud;
   }
   const _lastHUD = { l: null, c: null, r: null, fillPct: null, fillCol: null,
     nitroPct: null, nbActive: null, nbFull: null, btnReady: null, btnFiring: null,
-    comboText: null, comboShow: null, draftShow: null };
+    comboText: null, comboShow: null, draftShow: null, slowMoShow: null };
 
   function _setText(el, key, value) {
     if (!el || _lastHUD[key] === value) return;
@@ -632,6 +633,10 @@ const UI = (() => {
     if (h.dp) {
       const show = !!fx.drafting;
       if (_lastHUD.draftShow !== show) { _lastHUD.draftShow = show; h.dp.classList.toggle('visible', show); }
+    }
+    if (h.sp) {
+      const show = !!fx.slowMo;
+      if (_lastHUD.slowMoShow !== show) { _lastHUD.slowMoShow = show; h.sp.classList.toggle('visible', show); }
     }
   }
 

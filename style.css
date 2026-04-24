@@ -749,6 +749,29 @@ html, body {
 }
 .draft-pill.visible { display: block; }
 
+/* Slow-mo pill — shows when bullet-time engages near a hazard. Magenta so
+   it doesn't blur into the nitro/combo/draft palette. */
+.slowmo-pill {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  background: rgba(30,0,40,0.82);
+  border: 1px solid #f0f;
+  color: #f8f;
+  font-size: min(2.6vw, 9px);
+  letter-spacing: 2px;
+  z-index: 21;
+  display: none;
+  animation: slowmoFlash 0.9s ease-in-out infinite;
+}
+.slowmo-pill.visible { display: block; }
+@keyframes slowmoFlash {
+  0%, 100% { opacity: 1;    box-shadow: 0 0 8px #f0f; }
+  50%      { opacity: 0.55; box-shadow: 0 0 2px #f0f; }
+}
+
 /* On-screen nitro button — above pause button, same style. */
 .nitro-btn {
   position: fixed;

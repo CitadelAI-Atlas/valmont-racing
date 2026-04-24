@@ -190,19 +190,19 @@ const Game = (() => {
     animFrame = requestAnimationFrame(t => _loop(t, mode));
   }
 
-  // Ramp bulletTime toward 0.30 when any hazard sits 5–70 segs ahead; back
+  // Ramp bulletTime toward 0.25 when any hazard sits 4–90 segs ahead; back
   // to 1.0 otherwise. Real-time dt so ramping isn't itself slowed by slow-mo.
-  // At 100 mph (90 segs/sec) that's ~0.72s real = ~2.4s effective reaction.
+  // At 100 mph (~90 segs/sec) that's ~1s real = ~4s effective reaction window.
   function _updateBulletTime(realDt, mode) {
     let target = 1.0;
-    if (mode === 'race' && segments.length && playerSpeed > 0.35) {
+    if (mode === 'race' && segments.length && playerSpeed > 0.25) {
       const L = segments.length;
       const pSeg = Math.floor(playerZ);
-      for (let i = 5; i < 70 && target === 1.0; i++) {
+      for (let i = 4; i < 90 && target === 1.0; i++) {
         const seg = segments[(pSeg + i) % L];
         if (!seg || !seg.staticSprites.length) continue;
         for (let k = 0; k < seg.staticSprites.length; k++) {
-          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.30; break; }
+          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.25; break; }
         }
       }
     }
@@ -321,7 +321,7 @@ const Game = (() => {
 
     // Engine pitch reacts to the actual boosted speed so nitro is audible.
     AudioFX.setEngineSpeed(playerSpeed * (nitroActive ? 1.12 : 1.0));
-    const hudFx = { nitro, nitroActive, combo, drafting };
+    const hudFx = { nitro, nitroActive, combo, drafting, slowMo: bulletTime < 0.9 };
     if (mode === 'race') {
       UI.updateHUD('race', { pos: Math.round(position), time: raceTime, speed: speedMPH, lap, totalLaps, fx: hudFx });
     } else {
@@ -597,15 +597,17 @@ const Game = (() => {
       // ── Player avoidance ──
       // If the player is in our lane just ahead and we're faster, pick an
       // open adjacent lane. If no lane is open, speed-match the player —
-      // never drive through them.
+      // never drive through them. Use tc.x (actual position) not LANES[tc.lane]
+      // (target) so mid-lane-change cars still brake instead of slicing through.
       const tSeg = Math.floor(tc.z) % L;
       const pSeg = Math.floor(playerZ) % L;
-      const behindP = ((pSeg - tSeg + L) % L) < 12;
-      if (behindP && tc.speed > playerSpeed + 0.05 && Math.abs(LANES[tc.lane] - playerX) < 0.25) {
+      const behindP = ((pSeg - tSeg + L) % L) < 14;
+      const laneProx = Math.min(Math.abs(tc.x - playerX), Math.abs(LANES[tc.lane] - playerX));
+      if (behindP && tc.speed > playerSpeed + 0.02 && laneProx < 0.35) {
         let changed = false;
         if (tc._laneCooldown <= 0) {
           const newLane = _pickLaneChange(tc, L);
-          if (newLane !== tc.lane) {
+          if (newLane !== tc.lane && Math.abs(LANES[newLane] - playerX) >= 0.35) {
             tc.lane = newLane;
             tc._laneCooldown = 1.5;
             changed = true;
@@ -731,7 +733,11 @@ const Game = (() => {
                        (track.iceZones  && track.iceZones.length);
     const heavyTraffic = (track.trafficDensity || 0) >= GameConstants.HEAVY_TRAFFIC;
     if (!hasOffroad && !heavyTraffic) return;
-    const types = track.hazards;
+    // Filter track.hazards to only entries that actually produce a hazard sprite.
+    // Entries like 'traffic_heavy' are density hints and would waste a roll.
+    const REAL = new Set(['oil', 'pothole', 'debris', 'ice', 'barrier', 'jump']);
+    const types = (track.hazards || []).filter(h => REAL.has(h));
+    if (!types.length) return;
     const rate  = track.hazardSpawnRate != null ? track.hazardSpawnRate : GameConstants.HAZARD_DEFAULT;
     segments.forEach(seg => {
       if (Math.random() > rate) return;
@@ -740,7 +746,7 @@ const Game = (() => {
       let st = null;
       if (ht === 'oil') st = 'oil';
       else if (ht === 'pothole') st = 'pothole';
-      else if (ht.startsWith('debris')) st = Math.random() < 0.30 ? 'tire' : 'debris';
+      else if (ht === 'debris') st = Math.random() < 0.30 ? 'tire' : 'debris';
       else if (ht === 'ice') st = 'ice';
       else if (ht === 'barrier') st = 'cone';
       else if (ht === 'jump') st = 'debris';
