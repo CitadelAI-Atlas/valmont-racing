@@ -1048,6 +1048,31 @@ const Game = (() => {
   // no allocations beyond the one object literal so it's safe to call from
   // window.onerror. Returns primitives only (no segment / track refs).
   function getDebugSnapshot() {
+    // Count hazards total + in the bullet-time detection window (4..130 ahead).
+    // Cheap enough for a 200ms debug tick; no allocations beyond ints.
+    let hazTotal = 0, hazAhead = 0, nearestAhead = -1;
+    if (segments && segments.length) {
+      const L = segments.length;
+      for (let i = 0; i < L; i++) {
+        const list = segments[i].staticSprites;
+        if (!list || !list.length) continue;
+        for (let k = 0; k < list.length; k++) {
+          if (_HAZARD_TYPES.has(list[k].type)) { hazTotal++; break; }
+        }
+      }
+      const pSeg = Math.floor(playerZ);
+      for (let i = 4; i < 130; i++) {
+        const seg = segments[(pSeg + i) % L];
+        if (!seg || !seg.staticSprites.length) continue;
+        for (let k = 0; k < seg.staticSprites.length; k++) {
+          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) {
+            hazAhead++;
+            if (nearestAhead < 0) nearestAhead = i;
+            break;
+          }
+        }
+      }
+    }
     return {
       state,
       track: track && track.id || null,
@@ -1064,6 +1089,8 @@ const Game = (() => {
       nitroActive, combo, drafting,
       trafficCount: trafficCars ? trafficCars.length : 0,
       segmentCount: segments ? segments.length : 0,
+      bulletTime: Number((bulletTime || 1).toFixed(2)),
+      hazTotal, hazAhead, nearestAhead,
     };
   }
 

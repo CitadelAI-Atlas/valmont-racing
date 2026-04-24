@@ -172,6 +172,24 @@
         } catch(e) { /* snapshot must never mask the original error */ }
         return false;
       };
+      // Live debug HUD — shows bullet-time + hazard state every 200ms so the
+      // user can verify slow-mo is actually engaging on NYC/Vegas without
+      // having to guess from the pill indicator.
+      var _dbgDiv = document.createElement('div');
+      _dbgDiv.id = 'dbg-hud';
+      _dbgDiv.style.cssText = 'position:fixed;top:4px;right:4px;background:rgba(0,0,0,0.72);color:#0f0;font:10px/1.3 monospace;padding:4px 6px;z-index:9998;pointer-events:none;white-space:pre;';
+      document.body.appendChild(_dbgDiv);
+      setInterval(function() {
+        try {
+          if (typeof Game === 'undefined' || !Game.getDebugSnapshot) return;
+          var s = Game.getDebugSnapshot();
+          _dbgDiv.textContent =
+            'TRK ' + s.track + '  STATE ' + s.state + '\n' +
+            'MPH ' + s.playerSpeed + '  Z ' + s.playerZ + '/' + s.segmentCount + '  L ' + s.lap + '/' + s.totalLaps + '\n' +
+            'BT  ' + s.bulletTime.toFixed(2) + (s.bulletTime < 0.9 ? ' ◀ SLOW-MO' : '') + '\n' +
+            'HAZ ' + s.hazAhead + ' ahead / ' + s.hazTotal + ' total  NEAR ' + s.nearestAhead;
+        } catch(e) { /* never let the debug tick throw */ }
+      }, 200);
     }
   </script>
   <script src="js/audio.js?v=100"></script>
@@ -180,7 +198,7 @@
   <script src="js/tracks.js?v=107"></script>
   <script src="js/renderer.js?v=105"></script>
   <script src="js/ui.js?v=102"></script>
-  <script src="js/game.js?v=114"></script>
+  <script src="js/game.js?v=115"></script>
   <script>
     // Confirm the start button wired up (critical — the game can't begin otherwise).
     var btn = document.getElementById('btn-start');
