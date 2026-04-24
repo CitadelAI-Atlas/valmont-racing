@@ -315,7 +315,11 @@ const Game = (() => {
     }
 
     _checkTrafficCollision(segIdx);
-    _checkHazardCollision(seg);
+    // Sweep every segment the player crossed this frame, not just one. At
+    // 100 mph (speed=1.0) dt=0.016s moves ~1.44 segs/frame, so single-segment
+    // checks tunnel right through debris/potholes. Pass both endpoints.
+    const endSeg = Math.floor(playerZ) % segments.length;
+    _checkHazardCollision(segIdx, endSeg);
     _updateTraffic(dt);
     if (mode === 'race') _updatePosition();
 
@@ -771,14 +775,25 @@ const Game = (() => {
   const _HAZARD_TYPES = new Set(['oil', 'pothole', 'debris', 'tire', 'ice', 'cone']);
   // Half-width scaled from each sprite's wRatio so wide tires get a wider
   // hitbox than a narrow cone. 0.18 is the base half-lane overlap threshold.
-  function _checkHazardCollision(seg) {
-    if (!seg) return;
-    const list = seg.staticSprites;
-    for (let i = 0; i < list.length; i++) {
-      const sp = list[i];
-      if (!_HAZARD_TYPES.has(sp.type)) continue;
-      const halfW = 0.18 * (sp.wRatio || 1);
-      if (Math.abs(sp.lane - playerX) < halfW) _applyHazard(sp.type);
+  // Iterates every segment in the player's swept path this frame; single-
+  // segment checks miss debris at highway speeds (>1 seg/frame).
+  function _checkHazardCollision(startIdx, endIdx) {
+    const L = segments.length;
+    if (!L) return;
+    // Forward distance from start to end, handling lap wraparound. Cap at 8
+    // as a sanity guard in case a dt spike made the range huge.
+    let span = (endIdx - startIdx + L) % L;
+    if (span > 8) span = 8;
+    for (let k = 0; k <= span; k++) {
+      const seg = segments[(startIdx + k) % L];
+      if (!seg) continue;
+      const list = seg.staticSprites;
+      for (let i = 0; i < list.length; i++) {
+        const sp = list[i];
+        if (!_HAZARD_TYPES.has(sp.type)) continue;
+        const halfW = 0.18 * (sp.wRatio || 1);
+        if (Math.abs(sp.lane - playerX) < halfW) { _applyHazard(sp.type); return; }
+      }
     }
   }
 
