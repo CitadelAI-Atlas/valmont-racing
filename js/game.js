@@ -190,19 +190,20 @@ const Game = (() => {
     animFrame = requestAnimationFrame(t => _loop(t, mode));
   }
 
-  // Ramp bulletTime toward 0.25 when any hazard sits 4–90 segs ahead; back
-  // to 1.0 otherwise. Real-time dt so ramping isn't itself slowed by slow-mo.
-  // At 100 mph (~90 segs/sec) that's ~1s real = ~4s effective reaction window.
+  // Ramp bulletTime toward 0.10 (world moves at 1/10 speed — 100 mph feels
+  // like 10 mph) when any hazard sits 4–130 segs ahead; back to 1.0 otherwise.
+  // Real-time dt so ramping isn't itself slowed by slow-mo. At 100 mph the
+  // 130-seg runway is ~1.45s real, stretched to ~14s of reaction in slow-mo.
   function _updateBulletTime(realDt, mode) {
     let target = 1.0;
-    if (mode === 'race' && segments.length && playerSpeed > 0.25) {
+    if (mode === 'race' && segments.length && playerSpeed > 0.20) {
       const L = segments.length;
       const pSeg = Math.floor(playerZ);
-      for (let i = 4; i < 90 && target === 1.0; i++) {
+      for (let i = 4; i < 130 && target === 1.0; i++) {
         const seg = segments[(pSeg + i) % L];
         if (!seg || !seg.staticSprites.length) continue;
         for (let k = 0; k < seg.staticSprites.length; k++) {
-          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.25; break; }
+          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.10; break; }
         }
       }
     }
