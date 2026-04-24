@@ -254,6 +254,7 @@ const TRACKS = [
     roadColor:  '#383838',
     lineColor:  '#ffff00',
     hazards: ['traffic_heavy', 'pothole', 'debris'],
+    hazardSpawnRate: 0.06,           // NYC streets: potholes everywhere — ~11 hazards over 180 segs
     trafficDensity: 0.75,
     length: 180,
     curves: [
@@ -288,6 +289,7 @@ const TRACKS = [
     roadColor:  '#1e1e1e',
     lineColor:  '#ffd700',
     hazards: ['traffic_heavy', 'debris'],
+    hazardSpawnRate: 0.05,           // Vegas Strip: stray cones and debris — ~10 across 210 segs
     trafficDensity: 0.70,
     length: 210,
     curves: [
@@ -313,7 +315,7 @@ const TRACKS = [
 const TRACK_DEFAULTS = Object.freeze({
   lapGoal:         2,
   qualifyTime:     50,
-  hazardSpawnRate: 0.015,
+  hazardSpawnRate: 0.035,
   cloudCount:      4,    // auto-forced to 0 on night tracks in the renderer
   scenery:        ['billboard'],
   trafficPool:    ['Sport01','Comfort01','Highway01'],
@@ -345,7 +347,7 @@ const GameConstants = Object.freeze({
   SCENERY_STEP:       40,     // seed scenery every N segments
   SCENERY_PROB:       0.55,   // per-side spawn probability at each seeded segment
   TRAFFIC_PER_SEG:    0.025,  // traffic count = segments * density * this
-  HAZARD_DEFAULT:     0.015,  // default per-segment hazard roll when track omits hazardSpawnRate
+  HAZARD_DEFAULT:     0.035,  // default per-segment hazard roll when track omits hazardSpawnRate
   DEFAULT_TIER:       3,      // fall-back tier for TIER_RULES lookup
   QUALIFY_SPEED_REF:  118,    // cars.topSpeed reference for qualify-time speed scaling
   DRAW_DISTANCE:      400,    // renderer: number of projected segments
