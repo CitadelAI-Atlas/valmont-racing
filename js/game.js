@@ -194,9 +194,11 @@ const Game = (() => {
   // like 10 mph) when any hazard sits 4–130 segs ahead; back to 1.0 otherwise.
   // Real-time dt so ramping isn't itself slowed by slow-mo. At 100 mph the
   // 130-seg runway is ~1.45s real, stretched to ~14s of reaction in slow-mo.
+  // Fires in both qualify and race — qualify hazards are identical and the
+  // player's first impression of a track is the qualify lap.
   function _updateBulletTime(realDt, mode) {
     let target = 1.0;
-    if (mode === 'race' && segments.length && playerSpeed > 0.20) {
+    if ((mode === 'race' || mode === 'qualify') && segments.length && playerSpeed > 0.20) {
       const L = segments.length;
       const pSeg = Math.floor(playerZ);
       for (let i = 4; i < 130 && target === 1.0; i++) {
