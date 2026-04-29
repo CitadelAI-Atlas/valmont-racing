@@ -18,10 +18,12 @@ const Game = (() => {
 
   let lap = 0, totalLaps = 3, raceTime = 0, finished = false, position = 1;
   let hazardEffect = null, crashTimer = 0;
-  // Bullet-time multiplier: drops toward 0.40 when a hazard is in reaction
-  // range (8–28 segs ahead), back to 1.0 otherwise. At 100+ mph the player
-  // would otherwise see a tire for <1 frame.
+  // Bullet-time state machine. Drops to 0.10 only when a hazard sits in the
+  // player's actual collision lane within a tight reaction zone, then locks
+  // out for a cooldown so a hazard cluster doesn't produce one continuous
+  // slow-mo. _btMode: 'idle' | 'active' | 'cooldown'. _btTimer in real seconds.
   let bulletTime = 1.0;
+  let _btMode = 'idle', _btTimer = 0;
   let trafficCars = [];
   let countdown = -1, countdownTimer = null;
   let canvas = null, ctx = null, animFrame = null;
@@ -190,24 +192,48 @@ const Game = (() => {
     animFrame = requestAnimationFrame(t => _loop(t, mode));
   }
 
-  // Ramp bulletTime toward 0.10 (world moves at 1/10 speed — 100 mph feels
-  // like 10 mph) when any hazard sits 4–130 segs ahead; back to 1.0 otherwise.
-  // Real-time dt so ramping isn't itself slowed by slow-mo. At 100 mph the
-  // 130-seg runway is ~1.45s real, stretched to ~14s of reaction in slow-mo.
-  // Fires in both qualify and race — qualify hazards are identical and the
-  // player's first impression of a track is the qualify lap.
-  function _updateBulletTime(realDt, mode) {
-    let target = 1.0;
-    if ((mode === 'race' || mode === 'qualify') && segments.length && playerSpeed > 0.20) {
-      const L = segments.length;
-      const pSeg = Math.floor(playerZ);
-      for (let i = 4; i < 130 && target === 1.0; i++) {
-        const seg = segments[(pSeg + i) % L];
-        if (!seg || !seg.staticSprites.length) continue;
-        for (let k = 0; k < seg.staticSprites.length; k++) {
-          if (_HAZARD_TYPES.has(seg.staticSprites[k].type)) { target = 0.10; break; }
-        }
+  // Bullet-time scan: returns true if a hazard sits in the player's collision
+  // lane within the reaction zone. NEAR/FAR define a tight runway — wider
+  // than this and slow-mo fires constantly on hazard-heavy tracks. Lane gate
+  // is 0.55 wide (vs the 0.18*wRatio collision band) so the player has room
+  // to arc around without a "false trigger" on hazards already off-line.
+  function _hazardInReactionLane() {
+    const L = segments.length;
+    if (!L) return false;
+    const pSeg = Math.floor(playerZ);
+    const NEAR = 20, FAR = 75;
+    for (let i = NEAR; i < FAR; i++) {
+      const seg = segments[(pSeg + i) % L];
+      if (!seg || !seg.staticSprites.length) continue;
+      for (let k = 0; k < seg.staticSprites.length; k++) {
+        const sp = seg.staticSprites[k];
+        if (!_HAZARD_TYPES.has(sp.type)) continue;
+        if (Math.abs(sp.lane - playerX) < 0.55) return true;
       }
+    }
+    return false;
+  }
+
+  // State machine: idle → active when a lane hazard appears in the reaction
+  // window. Stays active until the hazard passes (or moves out of lane), then
+  // cooldown for 2s real-time so the next hazard in a cluster doesn't instantly
+  // re-fire. Real-time dt so cooldown isn't itself slowed by bullet-time.
+  function _updateBulletTime(realDt, mode) {
+    if (_btTimer > 0) _btTimer = Math.max(0, _btTimer - realDt);
+    let target = 1.0;
+    const eligible = (mode === 'race' || mode === 'qualify') && segments.length && playerSpeed > 0.20;
+    if (!eligible) {
+      _btMode = 'idle'; _btTimer = 0;
+    } else {
+      const hazard = _hazardInReactionLane();
+      if (_btMode === 'idle' && hazard) {
+        _btMode = 'active';
+      } else if (_btMode === 'active' && !hazard) {
+        _btMode = 'cooldown'; _btTimer = 2.0;
+      } else if (_btMode === 'cooldown' && _btTimer <= 0) {
+        _btMode = 'idle';
+      }
+      if (_btMode === 'active') target = 0.10;
     }
     bulletTime += (target - bulletTime) * Math.min(1, 8 * realDt);
   }

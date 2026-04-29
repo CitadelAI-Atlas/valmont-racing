@@ -222,7 +222,7 @@ const TRACKS = [
     lineColor:  '#ffffff',
     horizonGlow: 'rgba(180,140,90,0.32)',
     hazards: ['debris', 'oil', 'pothole'],
-    hazardSpawnRate: 0.07,           // hero-track rate — ~14 hazards across 210 segs
+    hazardSpawnRate: 0.004,          // ~17 hazards across 4200 segs — rare debris in 5 lanes of gridlock
     trafficDensity: 18.0,            // HERO — true rush-hour gridlock (~20x normal)
     trafficSpeedCap: 0.40,           // 40 mph cap — everyone stuck at commute pace
     length: 210,
@@ -254,7 +254,7 @@ const TRACKS = [
     roadColor:  '#383838',
     lineColor:  '#ffff00',
     hazards: ['traffic_heavy', 'pothole', 'debris'],
-    hazardSpawnRate: 0.06,           // NYC streets: potholes everywhere — ~11 hazards over 180 segs
+    hazardSpawnRate: 0.004,          // ~14 hazards across 3600 segs — periodic NYC potholes, lane-gated
     trafficDensity: 0.75,
     length: 180,
     curves: [
@@ -289,7 +289,7 @@ const TRACKS = [
     roadColor:  '#1e1e1e',
     lineColor:  '#ffd700',
     hazards: ['traffic_heavy', 'debris'],
-    hazardSpawnRate: 0.05,           // Vegas Strip: stray cones and debris — ~10 across 210 segs
+    hazardSpawnRate: 0.003,          // ~12 hazards across 4200 segs — stray Strip debris, mostly avoidable
     trafficDensity: 0.70,
     length: 210,
     curves: [
@@ -315,7 +315,7 @@ const TRACKS = [
 const TRACK_DEFAULTS = Object.freeze({
   lapGoal:         2,
   qualifyTime:     50,
-  hazardSpawnRate: 0.035,
+  hazardSpawnRate: 0.002,
   cloudCount:      4,    // auto-forced to 0 on night tracks in the renderer
   scenery:        ['billboard'],
   trafficPool:    ['Sport01','Comfort01','Highway01'],
@@ -347,7 +347,7 @@ const GameConstants = Object.freeze({
   SCENERY_STEP:       40,     // seed scenery every N segments
   SCENERY_PROB:       0.55,   // per-side spawn probability at each seeded segment
   TRAFFIC_PER_SEG:    0.025,  // traffic count = segments * density * this
-  HAZARD_DEFAULT:     0.035,  // default per-segment hazard roll when track omits hazardSpawnRate
+  HAZARD_DEFAULT:     0.002,  // default per-segment hazard roll when track omits hazardSpawnRate
   DEFAULT_TIER:       3,      // fall-back tier for TIER_RULES lookup
   QUALIFY_SPEED_REF:  118,    // cars.topSpeed reference for qualify-time speed scaling
   DRAW_DISTANCE:      400,    // renderer: number of projected segments
